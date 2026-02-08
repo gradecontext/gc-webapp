@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --surface: 244 246 251;
+  --surface-strong: 232 237 247;
+  --surface-muted: 215 224 242;
+  --ink: 11 12 16;
+  --ink-muted: 35 39 52;
+  --mint: 53 200 154;
+  --ember: 236 123 68;
+  --ring: 89 224 176;
+}
+
+* {
+  @apply border-haze-200;
+}
+
+body {
+  @apply bg-haze-50 text-ink-900 font-body antialiased;
+  background-image: radial-gradient(circle at top left, rgba(89, 224, 176, 0.18), transparent 45%),
+    radial-gradient(circle at 20% 10%, rgba(143, 162, 212, 0.2), transparent 50%);
+}
+
+main {
+  min-height: 100vh;
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-xl border border-white/60 shadow-panel;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em];
+  }
+
+  .stat-card {
+    @apply glass-panel rounded-3xl p-6 transition-shadow hover:shadow-glow;
+  }
+
+  .section-title {
+    @apply text-sm font-semibold uppercase tracking-[0.25em] text-ink-300;
+  }
+}
