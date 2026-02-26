@@ -36,6 +36,18 @@ const config: Config = {
           400: "#AAB9E0",
           500: "#8FA2D4"
         },
+        accent: {
+          50: "#EEFCF8",
+          100: "#D5F7EE",
+          200: "#AEF0DE",
+          300: "#7AE4CA",
+          400: "#36C9B8",
+          500: "#30B5A6",
+          600: "#2BA193",
+          700: "#1E7D72",
+          800: "#1A635B",
+          900: "#174F49"
+        },
         mint: {
           400: "#59E0B0",
           500: "#35C89A",
@@ -52,11 +64,13 @@ const config: Config = {
         body: ["var(--font-body)", "ui-sans-serif", "system-ui"]
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(89, 224, 176, 0.2), 0 8px 24px rgba(11, 12, 16, 0.45)",
-        panel: "0 12px 32px rgba(11, 12, 16, 0.4)"
+        glow: "0 0 0 1px rgba(43, 161, 147, 0.25), 0 8px 24px rgba(11, 12, 16, 0.35)",
+        "glow-accent": "0 0 60px -15px hsl(173 58% 45% / 0.4)",
+        panel: "0 12px 32px rgba(11, 12, 16, 0.08)"
       },
       backgroundImage: {
-        "radial-glow": "radial-gradient(circle at top, rgba(89, 224, 176, 0.18), transparent 60%)",
+        "gradient-accent": "linear-gradient(135deg, hsl(173 58% 40%) 0%, hsl(173 58% 50%) 100%)",
+        "radial-glow": "radial-gradient(circle at top, rgba(43, 161, 147, 0.18), transparent 60%)",
         "grid-lines": "linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)"
       },
       keyframes: {

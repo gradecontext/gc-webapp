@@ -1,13 +1,27 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { Topbar } from "@/components/layout/Topbar";
 import { DecisionQueue } from "@/components/decisions/DecisionQueue";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 export default function HomePage() {
   return (
     <AppShell>
       <div className="space-y-8">
-        <Topbar />
+        {/* Hero section */}
+        <div className="flex flex-col gap-6 rounded-3xl border border-white/60 bg-white/80 p-6 shadow-panel md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <Badge variant="mint" className="badge">
+              Live decisions
+            </Badge>
+            <h1 className="text-2xl font-semibold text-ink-900 md:text-3xl">
+              Decision intelligence for onboarding, pricing, and trust.
+            </h1>
+            <p className="text-sm text-ink-300">
+              You are in the execution path. Every decision is audited, replayable, and human-verified.
+            </p>
+          </div>
+        </div>
+
         <section className="grid gap-6 lg:grid-cols-3">
           {[
             {

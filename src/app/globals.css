@@ -9,9 +9,17 @@
   --surface-muted: 215 224 242;
   --ink: 11 12 16;
   --ink-muted: 35 39 52;
-  --mint: 53 200 154;
+  --accent: 43 161 147;
+  --accent-light: 54 201 184;
   --ember: 236 123 68;
-  --ring: 89 224 176;
+  --ring: 43 161 147;
+
+  /* ContextGrade brand */
+  --gradient-accent: linear-gradient(135deg, hsl(173 58% 40%) 0%, hsl(173 58% 50%) 100%);
+  --shadow-glow: 0 0 60px -15px hsl(173 58% 45% / 0.4);
+
+  /* Sidebar */
+  --sidebar-width: 18rem;
 }
 
 * {
@@ -20,12 +28,27 @@
 
 body {
   @apply bg-haze-50 text-ink-900 font-body antialiased;
-  background-image: radial-gradient(circle at top left, rgba(89, 224, 176, 0.18), transparent 45%),
-    radial-gradient(circle at 20% 10%, rgba(143, 162, 212, 0.2), transparent 50%);
+  background-image: radial-gradient(circle at top left, rgba(43, 161, 147, 0.12), transparent 45%),
+    radial-gradient(circle at 80% 20%, rgba(143, 162, 212, 0.15), transparent 50%);
 }
 
 main {
   min-height: 100vh;
+}
+
+/* Custom scrollbar for sidebar */
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(43, 161, 147, 0.2);
+  border-radius: 9999px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(43, 161, 147, 0.4);
 }
 
 @layer components {

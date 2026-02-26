@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Manrope, Sora } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/providers/AuthProvider";
+import { CompanyDetailsModal } from "@/components/auth/CompanyDetailsModal";
 
 const displayFont = Sora({
   subsets: ["latin"],
@@ -30,7 +32,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${displayFont.variable} ${bodyFont.variable}`}>
       <body className="min-h-screen bg-haze-50 text-ink-900">
-        {children}
+        <AuthProvider>
+          {children}
+          <CompanyDetailsModal />
+        </AuthProvider>
       </body>
     </html>
   );
