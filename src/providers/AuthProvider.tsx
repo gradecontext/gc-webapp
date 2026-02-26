@@ -40,7 +40,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [needsRegistration, setNeedsRegistration] = useState(false);
 
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return createClient();
+  }, []);
 
   const checkBackendUser = useCallback(async (accessToken: string) => {
     const { user, notFound } = await fetchCurrentUser(accessToken);
@@ -53,6 +56,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!supabase) return;
+
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       if (s?.access_token) {
@@ -78,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase, checkBackendUser]);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await supabase?.auth.signOut();
     setSession(null);
     setBackendUser(null);
     setNeedsRegistration(false);
