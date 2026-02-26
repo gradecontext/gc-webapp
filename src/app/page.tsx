@@ -1,9 +1,30 @@
+"use client";
+
+import { useAuth } from "@/providers/AuthProvider";
+import { LandingPage } from "@/components/landing/LandingPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { DecisionQueue } from "@/components/decisions/DecisionQueue";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 export default function HomePage() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-haze-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent-400 border-t-transparent" />
+          <p className="text-sm text-ink-300">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LandingPage />;
+  }
+
   return (
     <AppShell>
       <div className="space-y-8">

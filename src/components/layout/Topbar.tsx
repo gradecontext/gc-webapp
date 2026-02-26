@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
 import {
   Bell,
   ChevronDown,
@@ -24,15 +26,30 @@ import {
 
 interface TopbarProps {
   onMenuToggle: () => void;
+  minimal?: boolean;
+  transparent?: boolean;
   className?: string;
 }
 
-export function Topbar({ onMenuToggle, className }: TopbarProps) {
+export function Topbar({ onMenuToggle, minimal, transparent, className }: TopbarProps) {
   const { user, backendUser, loading, signOut } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState<"sign-in" | "register">(
     "sign-in"
   );
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    if (!transparent) return;
+
+    function handleScroll() {
+      setScrolled(window.scrollY > 10);
+    }
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [transparent]);
 
   function openLogin() {
     setAuthModalTab("sign-in");
@@ -44,7 +61,7 @@ export function Topbar({ onMenuToggle, className }: TopbarProps) {
     setAuthModalOpen(true);
   }
 
-  const isAuthenticated = !!user && !!backendUser;
+  const isAuthenticated = !!user;
   const displayName =
     backendUser?.name ??
     backendUser?.display_name ??
@@ -56,28 +73,46 @@ export function Topbar({ onMenuToggle, className }: TopbarProps) {
     <>
       <header
         className={cn(
-          "sticky top-0 z-30 flex items-center gap-4 border-b border-white/60 bg-white/70 px-4 py-3 backdrop-blur-xl sm:px-6",
+          "sticky top-0 z-30 flex items-center gap-4 px-4 py-3 transition-[background-color,border-color,backdrop-filter] duration-300 sm:px-6",
+          transparent && !scrolled
+            ? "border-b border-transparent bg-transparent"
+            : "border-b border-white/60 bg-white/70 backdrop-blur-xl",
           className
         )}
       >
-        {/* Mobile menu button */}
-        <button
-          onClick={onMenuToggle}
-          className="rounded-xl p-2 text-ink-400 transition hover:bg-haze-100 hover:text-ink-700 lg:hidden"
-          aria-label="Toggle sidebar"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        {minimal ? (
+          <Link href="/" className="flex items-center gap-2">
+            <Image
+              src="/logos/context-grade-logo.png"
+              alt="ContextGrade"
+              width={140}
+              height={36}
+              className="h-8 w-auto"
+              priority
+            />
+          </Link>
+        ) : (
+          <button
+            onClick={onMenuToggle}
+            className="rounded-xl p-2 text-ink-400 transition hover:bg-haze-100 hover:text-ink-700 lg:hidden"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
 
-        {/* Search */}
-        <div className="relative flex flex-1 items-center">
-          <Search className="absolute left-3 h-4 w-4 text-ink-300" />
-          <input
-            type="text"
-            placeholder="Search decisions, contexts, signals…"
-            className="h-10 w-full max-w-md rounded-xl border border-haze-200 bg-white/80 pl-10 pr-4 text-sm text-ink-900 placeholder:text-ink-300 transition focus:border-accent-400 focus:outline-none focus:ring-2 focus:ring-accent-400/30"
-          />
-        </div>
+        {minimal ? (
+          <div className="flex-1" />
+        ) : (
+          <div className="relative flex flex-1 items-center">
+            <Search className="absolute left-3 h-4 w-4 text-ink-300" />
+            <input
+              type="text"
+              placeholder="Search decisions, contexts, signals…"
+              className="h-10 w-full max-w-md rounded-xl border border-haze-200 bg-white/80 pl-10 pr-4 text-sm text-ink-900 placeholder:text-ink-300 transition focus:border-accent-400 focus:outline-none focus:ring-2 focus:ring-accent-400/30"
+            />
+          </div>
+        )}
 
         {/* Right actions */}
         <div className="flex items-center gap-2">

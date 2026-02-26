@@ -81,11 +81,16 @@ const config: Config = {
         "fade-up": {
           "0%": { opacity: "0", transform: "translateY(12px)" },
           "100%": { opacity: "1", transform: "translateY(0)" }
+        },
+        "fade-in-scale": {
+          "0%": { opacity: "0", transform: "scale(0.96) translateY(16px)" },
+          "100%": { opacity: "1", transform: "scale(1) translateY(0)" }
         }
       },
       animation: {
         float: "float 6s ease-in-out infinite",
-        "fade-up": "fade-up 0.6s ease-out both"
+        "fade-up": "fade-up 0.6s ease-out both",
+        "fade-in-scale": "fade-in-scale 0.5s cubic-bezier(0.16, 1, 0.3, 1) both"
       }
     }
   },
