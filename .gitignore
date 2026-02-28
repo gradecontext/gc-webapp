@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
 .next/
+next-env.d.ts
+.next/dev/types/routes.d.ts
 
 # Build output
 dist/
