@@ -26,6 +26,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+function syncSessionToLocalStorage(session: Session | null) {
+  if (session) {
+    const payload = {
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      expires_at: session.expires_at,
+      token_type: session.token_type ?? "bearer",
+    };
+    localStorage.setItem("cg_auth_signal", JSON.stringify(payload));
+    window.dispatchEvent(new CustomEvent("cg:auth", { detail: payload }));
+  } else {
+    localStorage.removeItem("cg_auth_signal");
+    window.dispatchEvent(new CustomEvent("cg:signout"));
+  }
+}
+
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
@@ -60,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
+      syncSessionToLocalStorage(s);
       if (s?.access_token) {
         checkBackendUser(s.access_token).finally(() => setLoading(false));
       } else {
@@ -71,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, s) => {
       setSession(s);
+      syncSessionToLocalStorage(s);
       if (s?.access_token) {
         await checkBackendUser(s.access_token);
       } else {
