@@ -1,65 +1,46 @@
 import type { LucideIcon } from "lucide-react";
-import {
-  Bolt,
-  ShieldCheck,
-  Layers,
-  Settings,
-  Users,
-  MessageCircle,
-  Workflow
-} from "lucide-react";
+import { ListChecks, ShieldCheck, FileText, Users } from "lucide-react";
+import type { MembershipRole } from "@/lib/api";
 
 export type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
   description: string;
+  /** Omit to show to every role. */
+  roles?: MembershipRole[];
 };
+
+const ADMIN_ROLES: MembershipRole[] = ["ADMIN", "OWNER"];
 
 export const primaryNav: NavItem[] = [
   {
-    label: "Decision Queue",
+    label: "Decisions",
     href: "/",
-    icon: Bolt,
-    description: "Live decisions needing review"
+    icon: ListChecks,
+    description: "Decision feed and review",
   },
   {
-    label: "Decision Trace",
-    href: "/decisions",
-    icon: Layers,
-    description: "Searchable precedent library"
+    label: "Reports",
+    href: "/reports",
+    icon: FileText,
+    description: "AI-compiled decision.md per context",
   },
-  {
-    label: "Contexts",
-    href: "/contexts",
-    icon: Workflow,
-    description: "Decision domains and policies"
-  },
-  {
-    label: "Signals",
-    href: "/signals",
-    icon: MessageCircle,
-    description: "Source health and provenance"
-  }
 ];
 
 export const secondaryNav: NavItem[] = [
   {
-    label: "People & Roles",
-    href: "/settings/roles",
+    label: "Team",
+    href: "/team",
     icon: Users,
-    description: "Approvers and escalation chains"
-  },
-  {
-    label: "Security",
-    href: "/settings/security",
-    icon: ShieldCheck,
-    description: "API keys and auth"
+    description: "Roster and pending approvals",
+    roles: ADMIN_ROLES,
   },
   {
     label: "Settings",
     href: "/settings",
-    icon: Settings,
-    description: "Tenant preferences"
-  }
+    icon: ShieldCheck,
+    description: "Decision types & context categories",
+    roles: ADMIN_ROLES,
+  },
 ];

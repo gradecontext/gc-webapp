@@ -1,10 +1,16 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { DecisionReview } from "@/components/decisions/DecisionReview";
+import { DecisionDetail } from "@/components/decisions/DecisionDetail";
 
-export default function DecisionDetailPage() {
+export default async function DecisionDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
   return (
     <AppShell>
-      <DecisionReview />
+      <DecisionDetail id={id} />
     </AppShell>
   );
 }

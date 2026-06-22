@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { useAuth } from "@/providers/AuthProvider";
-import { env } from "@/lib/env";
 import {
   createBackendUser,
   type ClientPlan,
   type CompanySize,
 } from "@/lib/auth-api";
+import { searchClients, type ClientSearchResult } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -26,13 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Building2, Loader2, Search, X } from "lucide-react";
-
-interface ClientSearchResult {
-  id: number;
-  name: string;
-  slug?: string;
-  plan?: string;
-}
 
 const companySchema = z.object({
   client_name: z.string().min(1, "Company name is required"),
@@ -67,6 +60,7 @@ export function CompanyDetailsModal() {
     setBackendUser,
     setNeedsRegistration,
     signOut,
+    refreshMemberships,
   } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -87,7 +81,7 @@ export function CompanyDetailsModal() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const searchClients = useCallback(
+  const runClientSearch = useCallback(
     async (query: string) => {
       if (!session?.access_token || query.length < 3) {
         setSearchResults([]);
@@ -97,22 +91,11 @@ export function CompanyDetailsModal() {
 
       setSearching(true);
       try {
-        const res = await fetch(
-          `${env.apiBaseUrl}/api/v1/clients/search?name=${encodeURIComponent(query)}&page=1&limit=10`,
-          {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          },
-        );
-
-        if (res.ok) {
-          const body = await res.json();
-          const clients: ClientSearchResult[] =
-            body?.data ?? body?.items ?? body ?? [];
-          setSearchResults(Array.isArray(clients) ? clients : []);
-          setShowDropdown(true);
-        } else {
-          setSearchResults([]);
-        }
+        const clients = await searchClients(query, {
+          accessToken: session.access_token,
+        });
+        setSearchResults(Array.isArray(clients) ? clients : []);
+        setShowDropdown(true);
       } catch {
         setSearchResults([]);
       } finally {
@@ -129,7 +112,7 @@ export function CompanyDetailsModal() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (value.length >= 3) {
-      debounceRef.current = setTimeout(() => searchClients(value), 300);
+      debounceRef.current = setTimeout(() => runClientSearch(value), 300);
     } else {
       setSearchResults([]);
       setShowDropdown(false);
@@ -209,6 +192,7 @@ export function CompanyDetailsModal() {
 
       setBackendUser(backendUser);
       setNeedsRegistration(false);
+      await refreshMemberships();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Setup failed");
     } finally {

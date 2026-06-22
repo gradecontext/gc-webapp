@@ -11,6 +11,9 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { BackendUserResponse, fetchCurrentUser } from "@/lib/auth-api";
+import { getMyMemberships, type Membership } from "@/lib/api";
+
+const ACTIVE_CLIENT_STORAGE_KEY = "cg_active_client_id";
 
 interface AuthContextType {
   session: Session | null;
@@ -22,6 +25,10 @@ interface AuthContextType {
   setBackendUser: (u: BackendUserResponse | null) => void;
   signOut: () => Promise<void>;
   refreshBackendUser: () => Promise<void>;
+  memberships: Membership[];
+  activeMembership: Membership | null;
+  setActiveClientId: (clientId: number) => void;
+  refreshMemberships: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -55,10 +62,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
   const [loading, setLoading] = useState(true);
   const [needsRegistration, setNeedsRegistration] = useState(false);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [activeClientId, setActiveClientIdState] = useState<number | null>(null);
 
   const supabase = useMemo(() => {
     if (typeof window === "undefined") return null;
     return createClient();
+  }, []);
+
+  const loadMemberships = useCallback(async (accessToken: string) => {
+    try {
+      const list = await getMyMemberships({ accessToken });
+      setMemberships(list);
+
+      const active = list.filter((m) => m.status === "ACTIVE");
+      const stored = Number(localStorage.getItem(ACTIVE_CLIENT_STORAGE_KEY));
+      const storedIsValid = active.some((m) => m.client.id === stored);
+
+      if (storedIsValid) {
+        setActiveClientIdState(stored);
+      } else if (active.length === 1) {
+        setActiveClientIdState(active[0].client.id);
+        localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, String(active[0].client.id));
+      } else {
+        setActiveClientIdState(null);
+      }
+    } catch {
+      setMemberships([]);
+      setActiveClientIdState(null);
+    }
   }, []);
 
   const checkBackendUser = useCallback(async (accessToken: string) => {
@@ -66,10 +98,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user) {
       setBackendUser(user);
       setNeedsRegistration(false);
+      await loadMemberships(accessToken);
     } else if (notFound) {
       setNeedsRegistration(true);
     }
+  }, [loadMemberships]);
+
+  const setActiveClientId = useCallback((clientId: number) => {
+    localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, String(clientId));
+    setActiveClientIdState(clientId);
   }, []);
+
+  const refreshMemberships = useCallback(async () => {
+    if (session?.access_token) {
+      await loadMemberships(session.access_token);
+    }
+  }, [session?.access_token, loadMemberships]);
+
+  const activeMembership = useMemo(
+    () => memberships.find((m) => m.client.id === activeClientId) ?? null,
+    [memberships, activeClientId]
+  );
 
   useEffect(() => {
     if (!supabase) return;
@@ -94,6 +143,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setBackendUser(null);
         setNeedsRegistration(false);
+        setMemberships([]);
+        setActiveClientIdState(null);
       }
     });
 
@@ -105,6 +156,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
     setBackendUser(null);
     setNeedsRegistration(false);
+    setMemberships([]);
+    setActiveClientIdState(null);
+    localStorage.removeItem(ACTIVE_CLIENT_STORAGE_KEY);
   }, [supabase]);
 
   const refreshBackendUser = useCallback(async () => {
@@ -124,6 +178,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setBackendUser,
       signOut,
       refreshBackendUser,
+      memberships,
+      activeMembership,
+      setActiveClientId,
+      refreshMemberships,
     }),
     [
       session,
@@ -132,6 +190,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       needsRegistration,
       signOut,
       refreshBackendUser,
+      memberships,
+      activeMembership,
+      setActiveClientId,
+      refreshMemberships,
     ]
   );
 

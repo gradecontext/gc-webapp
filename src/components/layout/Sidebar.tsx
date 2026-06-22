@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { primaryNav, secondaryNav } from "./navigation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/providers/AuthProvider";
 
 interface SidebarProps {
   open: boolean;
@@ -15,6 +16,12 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose, className }: SidebarProps) {
   const pathname = usePathname();
+  const { activeMembership } = useAuth();
+  const role = activeMembership?.role;
+
+  const visibleSecondaryNav = secondaryNav.filter(
+    (item) => !item.roles || (role && item.roles.includes(role))
+  );
 
   const sidebarContent = (
     <>
@@ -90,10 +97,11 @@ export function Sidebar({ open, onClose, className }: SidebarProps) {
           </div>
 
           {/* Operations section */}
+          {visibleSecondaryNav.length > 0 && (
           <div className="space-y-3">
             <p className="section-title px-3">Operations</p>
             <nav className="space-y-1">
-              {secondaryNav.map((item) => {
+              {visibleSecondaryNav.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link
@@ -133,6 +141,7 @@ export function Sidebar({ open, onClose, className }: SidebarProps) {
               })}
             </nav>
           </div>
+          )}
         </div>
       </div>
 

@@ -1,18 +1,17 @@
 import { env } from "@/lib/env";
 
 // ============================================================
-// CORE ENUMS (mirror backend Prisma enums)
+// AUTH CONTEXT (passed explicitly into every call below)
 // ============================================================
 
-export type DecisionType =
-  | "DISCOUNT"
-  | "ONBOARDING"
-  | "PAYMENT_TERMS"
-  | "CREDIT_EXTENSION"
-  | "PARTNERSHIP"
-  | "RENEWAL"
-  | "ESCALATION"
-  | "CUSTOM";
+export type ApiAuth = {
+  accessToken: string;
+  clientId?: number | null;
+};
+
+// ============================================================
+// CORE ENUMS (mirror backend per-client tables / Decision model)
+// ============================================================
 
 export type DecisionStatus =
   | "PROPOSED"
@@ -23,46 +22,79 @@ export type DecisionStatus =
   | "EXPIRED"
   | "ESCALATED";
 
-export type DecisionConfidence = "LOW" | "MEDIUM" | "HIGH" | "VERY_HIGH";
-
 export type DecisionUrgency = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 
-export type OutcomeType =
-  | "PAID_ON_TIME"
-  | "PAID_LATE"
-  | "CHURNED"
-  | "FRAUD"
-  | "EXPANDED"
-  | "DOWNGRADED"
-  | "DEFAULTED"
-  | "POSITIVE"
-  | "NEGATIVE"
-  | "NEUTRAL";
+export type MembershipRole = "OWNER" | "ADMIN" | "APPROVER" | "VIEWER";
+
+export type MembershipStatus = "ACTIVE" | "PENDING" | "REJECTED" | "REMOVED";
 
 // ============================================================
-// DECISION TYPES
+// DECISIONS
 // ============================================================
 
-export type DecisionRequest = {
-  client_id: number;
-  subject_company?: {                    // Optional — non-company decisions don't need this
-    external_id: string;
-    name: string;
-    domain?: string;
-    industry?: string;
-    country?: string;
-    metadata?: Record<string, unknown>;
-  };
-  deal?: {
-    crm_deal_id?: string;
-    amount?: number;
-    currency?: string;
-    discount_requested?: number;
-  };
-  decision_type: DecisionType;
-  context_key?: string;
-  summary?: string;
-  urgency?: DecisionUrgency;
+export type SubjectCompany = {
+  id: number;
+  name: string;
+  domain?: string | null;
+  external_id?: string | null;
+  industry?: string | null;
+  country?: string | null;
+};
+
+export type Decision = {
+  id: string;
+  summary: string | null;
+  decision_type: string;
+  status: DecisionStatus;
+  urgency: DecisionUrgency;
+  subject_company?: SubjectCompany | null;
+  created_at: string;
+  decided_at: string | null;
+  logged_by?: number | null;
+  logged_by_user?: { id: number; name: string | null } | null;
+};
+
+export type DecisionLinkType =
+  | "PRECEDENT"
+  | "SIMILAR_CASE"
+  | "POLICY_EXCEPTION"
+  | "CONTRADICTS"
+  | "SUPPORTS"
+  | "FOLLOW_UP";
+
+export type DecisionOverride = {
+  id?: string;
+  user_id: number;
+  override_action: string;
+  override_reason?: string | null;
+  created_at: string;
+  user?: { id: number; name?: string | null; email: string; title?: string | null } | null;
+};
+
+export type DecisionLink = {
+  id: string;
+  relationship_type: DecisionLinkType;
+  target_decision_id: string;
+  confidence?: number | null;
+  related_decision?: Pick<
+    Decision,
+    "id" | "status" | "summary" | "decision_type" | "created_at"
+  > | null;
+};
+
+export type DecisionContextSnapshot = {
+  signals?: unknown;
+  policies?: unknown;
+  agent_rationale?: string | null;
+  agent_model?: string | null;
+};
+
+export type DecisionDetail = Decision & {
+  decided_by_user?: { id: number; name: string | null; email: string } | null;
+  overrides: DecisionOverride[];
+  links: DecisionLink[];
+  notes: DecisionNote[];
+  context?: DecisionContextSnapshot | null;
 };
 
 export type DecisionReviewRequest = {
@@ -71,63 +103,15 @@ export type DecisionReviewRequest = {
   final_action?: string;
 };
 
-// ============================================================
-// BROWSER EXTENSION LAYER TYPES
-// ============================================================
-
-export type SourceApplication = {
-  id: string;                            // UUID
-  clientId: number;
-  name: string;
-  slug: string;
-  domainPattern?: string | null;
-  active: boolean;
-  settings?: Record<string, unknown> | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type ObservedEvent = {
-  id: string;                            // UUID
-  clientId: number;
-  sourceApp: string;                     // e.g. "salesforce", "jira"
-  sourceApplicationId?: string | null;   // UUID → source_applications
-  eventType: string;                     // e.g. "discount_changed", "ticket_closed"
-  sourceUrl?: string | null;
-  externalEntityId?: string | null;      // entity ID in the external system
-  title?: string | null;
-  description?: string | null;
-  occurredByUserId?: number | null;
-  rawPayload?: Record<string, unknown> | null;
-  metadata?: Record<string, unknown> | null;
-  convertedToDecisionId?: string | null; // UUID — set when promoted to a Decision
-  occurredAt: string;                    // ISO timestamp
-  createdAt: string;
-};
-
-export type CreateObservedEventRequest = {
-  client_id: number;
-  source_app: string;
-  source_application_id?: string;
-  event_type: string;
-  source_url?: string;
-  external_entity_id?: string;
-  title?: string;
-  description?: string;
-  occurred_by_user_id?: number;
-  raw_payload?: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-  occurred_at: string;
-};
-
 export type DecisionNote = {
-  id: string;                            // UUID
-  decisionId: string;                    // UUID
-  authorId?: number | null;
+  id: string;
+  decision_id: string;
+  author_id?: number | null;
+  author?: { id: number; name: string | null; email: string } | null;
   content: string;
-  sourceApp?: string | null;
-  sourceUrl?: string | null;
-  createdAt: string;
+  source_app?: string | null;
+  source_url?: string | null;
+  created_at: string;
 };
 
 export type CreateDecisionNoteRequest = {
@@ -136,150 +120,427 @@ export type CreateDecisionNoteRequest = {
   source_url?: string;
 };
 
-export type DecisionEntity = {
-  id: string;                            // UUID
-  decisionId: string;                    // UUID
-  entityType: string;                    // e.g. "jira_ticket", "figma_file", "github_pr"
-  entityId: string;                      // external system ID
+export type DecisionContext = {
+  id: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  category: string;
+  active: boolean;
+};
+
+export type Paginated<T> = {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+};
+
+// ============================================================
+// CLIENT DECISION TYPES / CONTEXT CATEGORIES
+// ============================================================
+
+export type ClientDecisionType = {
+  id: string;
+  decision_type: string;
+  label?: string | null;
+  is_reserved: boolean;
+  active: boolean;
+};
+
+export type ClientContextCategory = {
+  id: string;
+  category: string;
+  label?: string | null;
+  is_reserved: boolean;
+  active: boolean;
+};
+
+// ============================================================
+// AI DECISION REPORTS
+// ============================================================
+
+export type AiReportStatus = "PENDING" | "GENERATING" | "COMPLETED" | "FAILED";
+
+export type AiDecisionReport = {
+  id: string;
+  category_id: string;
+  title?: string | null;
+  status: AiReportStatus;
+  content?: string | null;
+  agent_model?: string | null;
+  created_at: string;
+};
+
+// ============================================================
+// MEMBERSHIPS
+// ============================================================
+
+export type MembershipClient = {
+  id: number;
+  name: string;
+  slug: string;
+  logo?: string | null;
+  plan: string;
+  active: boolean;
+};
+
+export type Membership = {
+  id: number;
+  role: MembershipRole;
+  status: MembershipStatus;
+  client: MembershipClient;
+};
+
+export type RosterMember = {
+  id: number;
+  user_id: number;
+  client_id: number;
+  role: MembershipRole;
+  status: MembershipStatus;
+  created_at: string;
+  updated_at: string;
+  user?: { id: number; email: string; name: string | null; image_url?: string | null } | null;
+};
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+export type Notification = {
+  id: string;
+  user_id: number;
+  type: string;
+  title: string;
+  message: string;
   metadata?: Record<string, unknown> | null;
-  createdAt: string;
-};
-
-export type CreateDecisionEntityRequest = {
-  entity_type: string;
-  entity_id: string;
-  metadata?: Record<string, unknown>;
+  read: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 // ============================================================
-// API HELPERS
+// CLIENT SEARCH
 // ============================================================
 
-function authHeaders(apiKey?: string): Record<string, string> {
-  return {
+export type ClientSearchResult = {
+  id: number;
+  name: string;
+  slug?: string;
+  plan?: string;
+};
+
+// ============================================================
+// FETCH HELPERS
+// ============================================================
+
+function authHeaders(auth: ApiAuth): Record<string, string> {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(apiKey ? { "X-API-Key": apiKey } : {}),
+    Authorization: `Bearer ${auth.accessToken}`,
   };
+  if (auth.clientId != null) headers["X-Client-Id"] = String(auth.clientId);
+  return headers;
+}
+
+/** Unwraps the `{ data: T }` envelope some endpoints use, falling back to the raw body. */
+function unwrap<T>(body: unknown): T {
+  if (body && typeof body === "object" && "data" in body) {
+    return (body as { data: T }).data;
+  }
+  return body as T;
+}
+
+/**
+ * Defensively coerces a list response into an array. The exact envelope for
+ * list endpoints isn't fully pinned down by the docs, so this tries a few
+ * common shapes (`{ items }`, `{ results }`, bare array) before giving up to
+ * an empty list rather than crashing callers that do `.map`/`.filter`.
+ */
+function asArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === "object") {
+    for (const key of ["items", "results", "data"]) {
+      const candidate = (value as Record<string, unknown>)[key];
+      if (Array.isArray(candidate)) return candidate as T[];
+    }
+  }
+  return [];
+}
+
+/**
+ * GET /decisions responds with `{ data: DecisionSummary[], total, page, limit }` —
+ * note `total`/`page`/`limit` are siblings of `data`, not nested inside it, so this
+ * must run on the raw body rather than after the generic `unwrap()`.
+ */
+function asPaginated<T>(body: unknown): Paginated<T> {
+  if (body && typeof body === "object") {
+    const obj = body as Record<string, unknown>;
+    const items = Array.isArray(obj.data) ? (obj.data as T[]) : [];
+    return {
+      items,
+      page: Number(obj.page) || 1,
+      limit: Number(obj.limit) || items.length,
+      total: Number(obj.total) || items.length,
+    };
+  }
+  return { items: [], page: 1, limit: 0, total: 0 };
+}
+
+async function requestJson(
+  path: string,
+  auth: ApiAuth,
+  options: RequestInit = {}
+): Promise<unknown> {
+  const res = await fetch(`${env.apiBaseUrl}/api/v1${path}`, {
+    ...options,
+    headers: { ...authHeaders(auth), ...(options.headers as Record<string, string> ?? {}) },
+  });
+
+  const body = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    const message =
+      (body as { message?: string; error?: string } | null)?.message ??
+      (body as { message?: string; error?: string } | null)?.error ??
+      `API error ${res.status}: ${path}`;
+    throw new Error(message);
+  }
+
+  return body;
 }
 
 async function apiFetch<T>(
   path: string,
-  options: RequestInit = {},
-  apiKey?: string
+  auth: ApiAuth,
+  options: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${env.apiBaseUrl}${path}`, {
-    ...options,
-    headers: { ...authHeaders(apiKey), ...(options.headers as Record<string, string> ?? {}) },
-  });
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
-  return res.json();
+  return unwrap<T>(await requestJson(path, auth, options));
+}
+
+async function apiFetchArray<T>(
+  path: string,
+  auth: ApiAuth,
+  options: RequestInit = {}
+): Promise<T[]> {
+  return asArray<T>(unwrap(await requestJson(path, auth, options)));
+}
+
+function query(params: Record<string, string | number | boolean | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === "" || value === false) continue;
+    search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : "";
 }
 
 // ============================================================
 // DECISIONS
 // ============================================================
 
-export function createDecision(payload: DecisionRequest, apiKey?: string) {
-  return apiFetch<unknown>("/api/v1/decisions", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }, apiKey);
+export async function listDecisions(
+  params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    decision_type?: string;
+    mine?: boolean;
+    logged_by?: number;
+    decided_by?: number;
+  },
+  auth: ApiAuth
+): Promise<Paginated<Decision>> {
+  return asPaginated<Decision>(await requestJson(`/decisions${query(params)}`, auth));
 }
 
-export function fetchDecision(id: string, apiKey?: string) {
-  return apiFetch<unknown>(`/api/v1/decisions/${id}`, {}, apiKey);
+export function getDecision(id: string, auth: ApiAuth) {
+  return apiFetch<DecisionDetail>(`/decisions/${id}`, auth);
 }
 
 export function reviewDecision(
   id: string,
   payload: DecisionReviewRequest,
-  apiKey?: string
+  auth: ApiAuth
 ) {
-  return apiFetch<unknown>(`/api/v1/decisions/${id}/review`, {
+  return apiFetch<DecisionDetail>(`/decisions/${id}/review`, auth, {
     method: "POST",
     body: JSON.stringify(payload),
-  }, apiKey);
+  });
 }
 
-// ============================================================
-// DECISION NOTES
-// ============================================================
-
-export function createDecisionNote(
-  decisionId: string,
+export function addDecisionNote(
+  id: string,
   payload: CreateDecisionNoteRequest,
-  apiKey?: string
+  auth: ApiAuth
 ) {
-  return apiFetch<DecisionNote>(`/api/v1/decisions/${decisionId}/notes`, {
+  return apiFetch<DecisionNote>(`/decisions/${id}/notes`, auth, {
     method: "POST",
     body: JSON.stringify(payload),
-  }, apiKey);
+  });
 }
 
-export function fetchDecisionNotes(decisionId: string, apiKey?: string) {
-  return apiFetch<DecisionNote[]>(`/api/v1/decisions/${decisionId}/notes`, {}, apiKey);
+export function listDecisionContexts(auth: ApiAuth) {
+  return apiFetchArray<DecisionContext>("/decisions/contexts", auth);
 }
 
 // ============================================================
-// DECISION ENTITIES
+// CLIENT DECISION TYPES
 // ============================================================
 
-export function createDecisionEntity(
-  decisionId: string,
-  payload: CreateDecisionEntityRequest,
-  apiKey?: string
+export function listDecisionTypes(auth: ApiAuth) {
+  return apiFetchArray<ClientDecisionType>("/decisions/types", auth);
+}
+
+export function createDecisionType(
+  payload: { decision_type: string; label?: string },
+  auth: ApiAuth
 ) {
-  return apiFetch<DecisionEntity>(`/api/v1/decisions/${decisionId}/entities`, {
+  return apiFetch<ClientDecisionType>("/decisions/types", auth, {
     method: "POST",
     body: JSON.stringify(payload),
-  }, apiKey);
+  });
+}
+
+export function updateDecisionType(
+  typeId: string,
+  payload: { decision_type?: string; label?: string; active?: boolean },
+  auth: ApiAuth
+) {
+  return apiFetch<ClientDecisionType>(`/decisions/types/${typeId}`, auth, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteDecisionType(typeId: string, auth: ApiAuth) {
+  return apiFetch<void>(`/decisions/types/${typeId}`, auth, { method: "DELETE" });
 }
 
 // ============================================================
-// OBSERVED EVENTS
+// CLIENT CONTEXT CATEGORIES
 // ============================================================
 
-export function createObservedEvent(
-  payload: CreateObservedEventRequest,
-  apiKey?: string
+export function listContextCategories(auth: ApiAuth) {
+  return apiFetchArray<ClientContextCategory>("/decisions/context-categories", auth);
+}
+
+export function createContextCategory(
+  payload: { category: string; label?: string },
+  auth: ApiAuth
 ) {
-  return apiFetch<ObservedEvent>("/api/v1/observed-events", {
+  return apiFetch<ClientContextCategory>("/decisions/context-categories", auth, {
     method: "POST",
     body: JSON.stringify(payload),
-  }, apiKey);
+  });
 }
 
-export function promoteObservedEvent(
-  eventId: string,
-  decisionPayload: Partial<DecisionRequest>,
-  apiKey?: string
+export function updateContextCategory(
+  categoryId: string,
+  payload: { category?: string; label?: string; active?: boolean },
+  auth: ApiAuth
 ) {
-  return apiFetch<unknown>(`/api/v1/observed-events/${eventId}/promote`, {
+  return apiFetch<ClientContextCategory>(`/decisions/context-categories/${categoryId}`, auth, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteContextCategory(categoryId: string, auth: ApiAuth) {
+  return apiFetch<void>(`/decisions/context-categories/${categoryId}`, auth, {
+    method: "DELETE",
+  });
+}
+
+// ============================================================
+// AI DECISION REPORTS
+// ============================================================
+
+export function listAiReports(
+  params: { category_id?: string; status?: string },
+  auth: ApiAuth
+) {
+  return apiFetchArray<AiDecisionReport>(`/ai-reports${query(params)}`, auth);
+}
+
+export function generateAiReport(categoryId: string, auth: ApiAuth) {
+  return apiFetch<AiDecisionReport>("/ai-reports/generate", auth, {
     method: "POST",
-    body: JSON.stringify(decisionPayload),
-  }, apiKey);
+    body: JSON.stringify({ category_id: categoryId }),
+  });
+}
+
+export function getAiReport(id: string, auth: ApiAuth) {
+  return apiFetch<AiDecisionReport>(`/ai-reports/${id}`, auth);
 }
 
 // ============================================================
-// SOURCE APPLICATIONS
+// MEMBERSHIPS
 // ============================================================
 
-export function fetchSourceApplications(clientId: number, apiKey?: string) {
-  return apiFetch<SourceApplication[]>(
-    `/api/v1/clients/${clientId}/source-applications`,
-    {},
-    apiKey
-  );
+export function getMyMemberships(auth: ApiAuth) {
+  return apiFetchArray<Membership>("/memberships/me", auth);
 }
 
-export function createSourceApplication(
+export function getClientRoster(
   clientId: number,
-  payload: Pick<SourceApplication, "name" | "slug" | "domainPattern" | "settings">,
-  apiKey?: string
+  params: { status?: string },
+  auth: ApiAuth
 ) {
-  return apiFetch<SourceApplication>(
-    `/api/v1/clients/${clientId}/source-applications`,
-    { method: "POST", body: JSON.stringify(payload) },
-    apiKey
+  return apiFetchArray<RosterMember>(`/memberships/client/${clientId}${query(params)}`, auth);
+}
+
+export function approveMembership(membershipId: number, auth: ApiAuth) {
+  return apiFetch<RosterMember>(`/memberships/${membershipId}/approve`, auth, {
+    method: "PATCH",
+  });
+}
+
+export function rejectMembership(membershipId: number, auth: ApiAuth) {
+  return apiFetch<RosterMember>(`/memberships/${membershipId}/reject`, auth, {
+    method: "PATCH",
+  });
+}
+
+export function changeMembershipRole(
+  membershipId: number,
+  role: MembershipRole,
+  auth: ApiAuth
+) {
+  return apiFetch<RosterMember>(`/memberships/${membershipId}/role`, auth, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function removeMembership(membershipId: number, auth: ApiAuth) {
+  return apiFetch<void>(`/memberships/${membershipId}`, auth, { method: "DELETE" });
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+export function listNotifications(auth: ApiAuth) {
+  return apiFetchArray<Notification>("/notifications", auth);
+}
+
+export function markNotificationRead(id: string, auth: ApiAuth) {
+  return apiFetch<Notification>(`/notifications/${id}/read`, auth, { method: "PATCH" });
+}
+
+export function markAllNotificationsRead(auth: ApiAuth) {
+  return apiFetch<void>("/notifications/read-all", auth, { method: "PATCH" });
+}
+
+// ============================================================
+// CLIENTS
+// ============================================================
+
+export function searchClients(name: string, auth: ApiAuth) {
+  return apiFetchArray<ClientSearchResult>(
+    `/clients/search${query({ name, page: 1, limit: 10 })}`,
+    auth
   );
 }
