@@ -51,6 +51,7 @@ export default function ReportsPage() {
 
   const [selected, setSelected] = useState<AiDecisionReport | null>(null);
   const [selectedLoading, setSelectedLoading] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     if (!accessToken || !clientId) return;
@@ -108,6 +109,14 @@ export default function ReportsPage() {
     }
   }
 
+  function handlePublicLink() {
+    if (!selected) return;
+    const url = `${window.location.origin}/decision/context/reports/${selected.id}.md`;
+    navigator.clipboard.writeText(url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
+
   function handleDownload() {
     if (!selected?.content) return;
     const base = selected.title ?? `${selected.category_id}-${selected.id}`;
@@ -126,7 +135,7 @@ export default function ReportsPage() {
       <div className="space-y-8">
         <div>
           <p className="section-title">AI Decision Reports</p>
-          <h1 className="text-3xl font-semibold text-ink-900">decision.md, compiled on demand</h1>
+          <h1 className="text-3xl font-semibold text-ink-900">context.md, compiled on demand</h1>
           <p className="text-sm text-ink-300">
             Every decision under a context category, compiled into one Markdown document you can
             feed back into any AI tool as organizational context.
@@ -135,8 +144,8 @@ export default function ReportsPage() {
 
         <div className="rounded-2xl border border-haze-200 bg-white px-4 py-3 text-sm text-ink-300">
           Reports compile from decisions tagged with a context category at creation time. If a
-          report shows zero decisions, it&apos;s likely because nothing has been logged with a
-          <span className="font-mono">context_key</span> yet — not a bug in this screen.
+          report shows zero decisions, it&apos;s likely because nothing has been logged with a &nbsp;
+          <span className="font-mono">context_key</span> yet.
         </div>
 
         <Card className="p-6">
@@ -255,9 +264,19 @@ export default function ReportsPage() {
                       )}
                     </div>
                   </div>
-                  <Button size="sm" disabled={!selected.content} onClick={handleDownload}>
-                    Download .md
-                  </Button>
+                  <div className="flex shrink-0 gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={selected.status !== "COMPLETED"}
+                      onClick={handlePublicLink}
+                    >
+                      {linkCopied ? "Link copied" : "Copy public link"}
+                    </Button>
+                    <Button size="sm" disabled={!selected.content} onClick={handleDownload}>
+                      Download .md
+                    </Button>
+                  </div>
                 </div>
                 {selected.content ? (
                   <pre className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap rounded-2xl bg-haze-100 p-4 text-xs text-ink-700">

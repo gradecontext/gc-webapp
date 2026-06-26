@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { ListChecks, ShieldCheck, FileText, Users } from "lucide-react";
+import { ListChecks, ShieldCheck, FileText, Users, Globe } from "lucide-react";
 import type { MembershipRole } from "@/lib/api";
 
 export type NavItem = {
@@ -24,7 +24,7 @@ export const primaryNav: NavItem[] = [
     label: "Reports",
     href: "/reports",
     icon: FileText,
-    description: "AI-compiled decision.md per context",
+    description: "AI-compiled context.md per context",
   },
 ];
 
@@ -34,6 +34,13 @@ export const secondaryNav: NavItem[] = [
     href: "/team",
     icon: Users,
     description: "Roster and pending approvals",
+    roles: ADMIN_ROLES,
+  },
+  {
+    label: "Tracked Sites",
+    href: "/sources",
+    icon: Globe,
+    description: "Domains where the extension can capture",
     roles: ADMIN_ROLES,
   },
   {

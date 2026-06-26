@@ -157,6 +157,27 @@ export type ClientContextCategory = {
 };
 
 // ============================================================
+// CLIENT SUBJECT COMPANIES (SOURCES)
+// ============================================================
+// Admin-managed list of domains the Chrome extension is allowed to show its
+// capture icon on. Distinct from the `SubjectCompany` embed above (which is
+// the read-only view nested inside a decision) — this is the full management
+// row, including fields (active, client_id, timestamps) that embed doesn't carry.
+
+export type ClientSubjectCompany = {
+  id: number;
+  client_id: number;
+  external_id: string;
+  name: string;
+  domain?: string | null;
+  active: boolean;
+  industry?: string | null;
+  country?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// ============================================================
 // AI DECISION REPORTS
 // ============================================================
 
@@ -454,6 +475,31 @@ export function deleteContextCategory(categoryId: string, auth: ApiAuth) {
 }
 
 // ============================================================
+// CLIENT SUBJECT COMPANIES (SOURCES)
+// ============================================================
+
+export function listSubjectCompanies(auth: ApiAuth) {
+  return apiFetchArray<ClientSubjectCompany>("/decisions/subject-companies", auth);
+}
+
+export function createSubjectCompany(
+  payload: { name: string; domain?: string; external_id?: string },
+  auth: ApiAuth
+) {
+  return apiFetch<ClientSubjectCompany>("/decisions/subject-companies", auth, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Soft delete — backend sets `active: false` rather than removing the row. */
+export function deleteSubjectCompany(subjectCompanyId: number, auth: ApiAuth) {
+  return apiFetch<void>(`/decisions/subject-companies/${subjectCompanyId}`, auth, {
+    method: "DELETE",
+  });
+}
+
+// ============================================================
 // AI DECISION REPORTS
 // ============================================================
 
@@ -473,6 +519,19 @@ export function generateAiReport(categoryId: string, auth: ApiAuth) {
 
 export function getAiReport(id: string, auth: ApiAuth) {
   return apiFetch<AiDecisionReport>(`/ai-reports/${id}`, auth);
+}
+
+/**
+ * Public share-link fetch — deliberately sends no auth headers, mirroring the
+ * backend's unauthenticated `GET /ai-reports/:id/public` (the report's UUID is the
+ * only credential; only COMPLETED reports resolve). Returns null on a 404 rather
+ * than throwing, since "unknown/not-ready id" is an expected case for a public link.
+ */
+export async function getPublicAiReport(id: string): Promise<AiDecisionReport | null> {
+  const res = await fetch(`${env.apiBaseUrl}/api/v1/ai-reports/${id}/public`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`API error ${res.status}: /ai-reports/${id}/public`);
+  return res.json();
 }
 
 // ============================================================

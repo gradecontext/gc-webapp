@@ -172,7 +172,7 @@ As of 2026-06-21 this is also enforced server-side via `requireRole(...)` middle
 endpoints (403 for VIEWER/APPROVER). Keep the client-side gating anyway — it's UX (avoids a pointless
 round trip), not the only line of defense anymore.
 
-4. AI Decision Reports — "download/view their decision.md" — ✅ implemented: `src/app/reports/page.tsx`
+4. AI Decision Reports — "download/view their context.md" — ✅ implemented: `src/app/reports/page.tsx`
 GET /ai-reports?category_id=&status= — list, filterable by category and PENDING|GENERATING|COMPLETED| FAILED.
 POST /ai-reports/generate { category_id } — triggers compilation synchronously (the request blocks until the markdown is built — there's no polling needed today, the 201 response already contains the full report). Show a loading state for the duration of the call, not a "check back later" pattern, unless this changes to a background job later.
 GET /ai-reports/:id — full report including content (the compiled Markdown). Render it, and offer a "Download .md" button that does a client-side blob download of content as <title-or-slug>.md. No separate download endpoint exists — the file is just the content string. There is no `slug` field, and `title` is `null` until `status: "COMPLETED"` — fall back to `${category_id}-${id}` for the filename while it's null.
