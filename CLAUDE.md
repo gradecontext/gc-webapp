@@ -15,6 +15,19 @@ real API wiring — `src/lib/api.ts` is the typed client, no mock/dummy data rem
 Gaps" section further down has been mostly resolved; it's kept as dated history so the next gap (if any)
 doesn't get rediscovered the hard way.
 
+**As of 2026-06-26:** the backend replaced the `DecisionContext` (`context_key` → category) indirection
+with a direct, required `context_category` string on every `Decision`. `context_key`, `contextId`, and
+the `DecisionContext` model/type no longer exist anywhere in this stack — see "Backend Change —
+2026-06-26: `context_category`" below before touching anything that still references them.
+
+**Also as of 2026-06-26:** the membership role enum was simplified from four values
+(`OWNER`/`ADMIN`/`APPROVER`/`VIEWER`) to two (`ADMIN`/`STAFF`) — a real schema migration, not a
+relabeling. `OWNER`, `APPROVER`, and `VIEWER` no longer exist anywhere in this stack (frontend or
+backend); the API rejects them as invalid zod-enum values. See "Backend Change — 2026-06-26: Membership
+role model" below before touching anything that still references the old 4-role model. A user's
+self-service Profile screen (`src/app/profile/page.tsx`) was also added in this session — see Required
+Screens §6.
+
 ## Product Vision (inherited from backend)
 
 Most software stores *what happened* (Salesforce: deal state, Jira: ticket state, Figma: design state).
@@ -45,6 +58,7 @@ working in. It sends one request to `POST /decisions`:
 {
   "subject_company": { "name": "Welcome to FigJam", "domain": "figma.com" },
   "decision_type": "CUSTOM",
+  "context_category": "ENGINEERING",
   "summary": "Change the base color to navy",
   "note": {
     "content": "Change the base color to navy.\n\nWhy: Because navy is the project theme color.\n\nContext: Agreed during design review.",
@@ -60,6 +74,7 @@ Source URL	note.source_url
 Subject (page/entity name)	subject_company.name
 Domain	subject_company.domain
 Decision Type	decision_type
+Category	context_category
 Decision (what was decided)	summary
 Why	note.content
 Additional context	appended to note.content
@@ -81,18 +96,19 @@ decision now carries `logged_by`/`logged_by_user` (who created it) alongside the
 `GET /decisions`, not something this app has to approximate.
 
 Personas & Roles
-Membership to a client account carries a per-client role (UserRole enum): OWNER, ADMIN, APPROVER,
-VIEWER. The product ask maps onto these as:
+Membership to a client account carries a per-client role (UserRole enum): ADMIN, STAFF — simplified from
+the original four-value enum on 2026-06-26 (see "Backend Change — 2026-06-26: Membership role model"
+below). The product ask maps onto these as:
 
 Product term	Backend role(s)	Dashboard view
-Staff	VIEWER, APPROVER	Scoped — their own decisions only
-Lead / Admin	ADMIN, OWNER	Wholistic — every decision across the team
-A user's role is per client, not global — a person can be ADMIN at one client and VIEWER at another
+Staff	STAFF	Scoped — their own decisions only
+Lead / Admin	ADMIN	Wholistic — every decision across the team
+A user's role is per client, not global — a person can be ADMIN at one client and STAFF at another
 if they somehow hold two memberships (rare, but the data model allows it). Always read role from the
 membership object for the currently selected client, not a cached global value.
 
 Membership lifecycle: the first user to create a company gets ADMIN + ACTIVE immediately. Everyone who
-joins after that gets VIEWER + PENDING until an existing ADMIN/OWNER approves them (or domain-match
+joins after that gets STAFF + PENDING until an existing ADMIN approves them (or domain-match
 auto-approval kicks in, if configured). A PENDING membership should not be treated as logged in for
 client-scoped data — they have a User row but no usable clientId yet.
 
@@ -126,27 +142,39 @@ GET /decisions?page=&limit=&status=&decision_type=&mine=&logged_by=&decided_by= 
 an API key — no session to resolve "mine" from). Each `DecisionSummary` also carries
 `logged_by?: number` and `logged_by_user?: {id, name}`. Build:
 
-Lead/Admin (ADMIN/OWNER): render the list as-is, no `mine` param — this matches "wholistic view of
+Lead/Admin (ADMIN): render the list as-is, no `mine` param — this matches "wholistic view of
 all decisions made by all staff." Each row shows `logged_by_user.name` so admins can see who logged
 what without it being a productivity-tracking feature (it's lineage, not monitoring).
-Staff (VIEWER/APPROVER): call with `mine=true` — this is a real server-side filter now, not an
+Staff (STAFF): call with `mine=true` — this is a real server-side filter now, not an
 approximation.
-Each row: summary, decision_type, status (PROPOSED/PENDING_REVIEW/APPROVED/REJECTED/
+Each row: summary, decision_type, context_category (rendered as a pill on each tile as of 2026-06-26 —
+see "Backend Change — 2026-06-26" below), status (PROPOSED/PENDING_REVIEW/APPROVED/REJECTED/
 OVERRIDDEN/EXPIRED/ESCALATED), urgency, subject_company.name/domain, created_at, decided_at.
 Support filtering by status and decision_type (use GET /decisions/types to populate the type filter
 with the client's actual reserved + custom types, not a hardcoded enum — the enum was removed from the schema).
 
 2. Decision Detail ("see all context on the decision") — ✅ implemented: `src/components/decisions/DecisionDetail.tsx`
-GET /decisions/:id returns: core fields, decided_by_user, subject_company (with industry/country),
+GET /decisions/:id returns: core fields (incl. `context_category`, a required string set at creation —
+see "Backend Change — 2026-06-26" below), decided_by_user, subject_company (with industry/country),
 overrides[], links[], notes[] (oldest-first, `author{id,name,email}` embedded — added 2026-06-21,
 see history at the bottom of "Known Backend Gaps"), and an optional context block (signals, policies,
-agent_rationale, agent_model) which is the DecisionContextSnapshot — this is optional and will be
-absent on most decisions, since snapshots are no longer auto-created and are only written by future
+agent_rationale, agent_model) which is the DecisionContextSnapshot — not to be confused with
+`context_category` despite the similar name, this is a separate, unrelated, optional feature that will
+be absent on most decisions, since snapshots are no longer auto-created and are only written by future
 retroactive-analysis tooling. Design the context panel as an empty state by default, not a guaranteed
 section.
 
+UI layout (as of 2026-06-26): the main card's info-pill grid shows Category/Decided by/Decided at —
+Industry was dropped from here in favor of Category, since every decision now carries a context category
+but `subject_company.industry` is rarely populated. The Notes card renders directly below the main
+decision card, ahead of Context/Overrides/Context graph links, since the rationale is the most-read
+panel on this screen.
+
 Confirmed field names — these differ from the generic names used elsewhere in this doc, so use the
 exact ones below, not `action`/`reason`/`link_type`:
+- `context_category`: flat required string (e.g. `"ENGINEERING"`) on both the list summary and detail —
+  resolved server-side by value against `client_context_categories`, exactly like `decision_type`, and
+  fully independent of it (no derivation either way).
 - `overrides[]`: `{ user_id, override_action, override_reason?, created_at, user?: {id, name?, email, title?} }`
 - `links[]`: `{ id, relationship_type, target_decision_id, confidence?, related_decision?: {id, status, summary?, decision_type?, created_at} }`.
   Canonical `relationship_type` values: `PRECEDENT`, `SIMILAR_CASE`, `POLICY_EXCEPTION`,
@@ -167,9 +195,9 @@ RENEWAL, ESCALATION, CUSTOM) and 9 reserved context categories (PAYMENT, ONBOARD
 COMPLIANCE, ENGINEERING, SALES, PARTNERSHIP, SECURITY, CUSTOM) are seeded automatically per
 client via a DB trigger — never assume a hardcoded list, always render from the API response.
 
-These settings screens are gated to ADMIN/OWNER in the UI (`src/app/settings/page.tsx`) — ✅ implemented.
+These settings screens are gated to ADMIN in the UI (`src/app/settings/page.tsx`) — ✅ implemented.
 As of 2026-06-21 this is also enforced server-side via `requireRole(...)` middleware on all four
-endpoints (403 for VIEWER/APPROVER). Keep the client-side gating anyway — it's UX (avoids a pointless
+endpoints (403 for STAFF). Keep the client-side gating anyway — it's UX (avoids a pointless
 round trip), not the only line of defense anymore.
 
 4. AI Decision Reports — "download/view their context.md" — ✅ implemented: `src/app/reports/page.tsx`
@@ -182,13 +210,12 @@ with notes/overrides/outcomes), optionally appended with an AI Insights section 
 OPENAI_API_KEY configured (agent_model will be "gpt-4o-mini" when that happened, absent otherwise —
 use this to show/hide an "AI Insights" badge rather than assuming it's always present).
 
-context_id wiring fixed 2026-06-21: `processDecisionCreation` now resolves `context_key` →
-`DecisionContext` → sets `contextId` on the created decision (400 `Context '<key>' not found for this
-client` if it doesn't resolve). Remaining caveat — a product call, not a bug: the Chrome extension's
-documented `POST /decisions` payload (top of this doc) never actually sends `context_key` today, so
-decisions captured via the extension still won't auto-populate a category until that's addressed
-upstream in the extension. If reports keep showing zero decisions, check that before assuming this
-screen is broken.
+`context_category` superseded the old `context_key`/`contextId`/`DecisionContext` indirection entirely
+on 2026-06-26 (see "Backend Change — 2026-06-26" below) — every decision now carries a required
+`context_category` set at creation, so the "reports show zero decisions because nothing was tagged"
+failure mode this section used to warn about can no longer happen by construction. The disclaimer that
+used to sit above the report generator on this page (referencing `context_key`) was removed for the
+same reason — don't re-add it.
 
 5. Team management (implied by "lead/admin wholistic view") — ✅ implemented: `src/app/team/page.tsx`
 Not explicitly requested but required for an admin to get a wholistic team, and exposed already:
@@ -196,10 +223,39 @@ Not explicitly requested but required for an admin to get a wholistic team, and 
 GET /memberships/client/:clientId?status= — roster, with per-member role/status. Each row:
 `{ id, user_id, client_id, role, status, created_at, updated_at, user?: {id, email, name, image_url} }`
 — `user` is optional, no `title` field (that's only on decision-override `user` embeds).
-PATCH /memberships/:id/approve / /reject — clear the PENDING queue. ADMIN/OWNER only, enforced server-side (assertCallerIsAdmin). As of 2026-06-21, decision review and decision-type/context-category mutations are also enforced server-side this way — see "Known Backend Gaps" history below.
-PATCH /memberships/:id/role { role } — blocked if it would demote the last ADMIN/OWNER.
+PATCH /memberships/:id/approve / /reject — clear the PENDING queue. ADMIN only, enforced server-side (assertCallerIsAdmin). As of 2026-06-21, decision review and decision-type/context-category mutations are also enforced server-side this way — see "Known Backend Gaps" history below.
+PATCH /memberships/:id/role { role } — `role` must be `"ADMIN"` or `"STAFF"` (2026-06-26); blocked (400) if it would demote the last ADMIN. Disable the demote affordance in the UI when this is the org's only admin.
 DELETE /memberships/:id — self-removal allowed for anyone; removing someone else requires admin.
 GET /notifications, PATCH /notifications/:id/read, PATCH /notifications/read-all — membership request/approval/rejection notifications feed the admin's inbox. Response: `{ data: Notification[], unread_count }` where each item is `{ id, user_id, type, title, message, metadata, read, created_at, updated_at }` (fixed 2026-06-21 — `data` used to be an object, not an array; see history below).
+
+6. Profile (self-service account management) — ✅ implemented: `src/app/profile/page.tsx`
+Not one of the original 5 Required Screens, but added 2026-06-26 alongside the role-model migration:
+
+GET /users/me — same bootstrap endpoint described above, but the response is richer than the bootstrap
+flow needs: `id, supabase_auth_id, email, name, title, active, verified, display_name, user_name,
+image_url, user_image, user_image_cover, user_bio_detail, user_bio_brief, gender, created_at,
+updated_at, memberships[]` (each with embedded `client`: id/name/slug/domain/logo/cover_image/details/
+client_website/client_x/client_linkedin/client_instagram/verified/plan/active), and an optional `client`
+(the "currently selected" company, same shape as each `memberships[].client`) — **omitted, not null**,
+when ambiguous (user has >1 ACTIVE membership and no `X-Client-Id` was sent to pin one). The Profile
+page does not depend on this `client`/`memberships[]` pair for "current organization" — it reuses
+`activeMembership`/`memberships` from `AuthProvider` (sourced from the separate `/memberships/me`)
+for that, consistent with every other screen, and just renders a read-only "Your organizations" list
+from the auth-provider state instead of building a second switcher.
+PATCH /users/:id — `:id` is the caller's own `data.id`; backend independently verifies
+`supabaseAuthId` ownership (403 if you try another user's id, which can't happen here since the id is
+never user-supplied). Editable: `name, title, display_name, user_name, image_url, user_image,
+user_image_cover, user_bio_detail, user_bio_brief, gender` — all optional, the form only sends fields
+that changed. `email` is intentionally NOT editable here (no verification flow tied to Supabase Auth
+exists yet — don't add an email field to this form). 400 zod validation error if `user_bio_brief` >
+255 chars or `gender` isn't a valid enum value.
+**Caveat:** the exact `gender` enum isn't documented anywhere this app has access to — only one example
+value (`"PREFER_NOT_TO_SAY"`) appeared in the spec this screen was built from. The UI offers a small
+guessed set (`MALE`, `FEMALE`, `NON_BINARY`, `PREFER_NOT_TO_SAY`) plus "unspecified" (omits the field).
+If the backend's zod enum differs, the form will surface the resulting 400 inline — fix the option list
+in `src/app/profile/page.tsx` to match the real enum rather than guessing further.
+On successful PATCH, the page calls `setBackendUser()` (from `AuthProvider`) directly with the response
+so the Topbar's display name picks up the change without a full re-fetch.
 Full Endpoint Reference
 All under /api/v1. ✅ = role enforced server-side. ⚠️ = any ACTIVE member can call regardless of role
 (gate in UI only).
@@ -211,24 +267,23 @@ GET	/users/:id	Fetch a user	n/a
 PATCH	/users/:id	Update own profile	✅ self-only
 GET	/memberships/me	Own memberships (any status)	n/a
 GET	/memberships/client/:clientId	Roster for a client	none explicit
-PATCH	/memberships/:id/approve	Approve pending member	✅ admin/owner
-PATCH	/memberships/:id/reject	Reject pending member	✅ admin/owner
-PATCH	/memberships/:id/role	Change a member's role	✅ admin/owner
-DELETE	/memberships/:id	Remove a membership	✅ self or admin/owner
+PATCH	/memberships/:id/approve	Approve pending member	✅ admin
+PATCH	/memberships/:id/reject	Reject pending member	✅ admin
+PATCH	/memberships/:id/role	Change a member's role (ADMIN|STAFF, 2026-06-26)	✅ admin
+DELETE	/memberships/:id	Remove a membership	✅ self or admin
 GET	/decisions	List decisions (client-wide, paginated; ?mine=/?logged_by=/?decided_by= as of 2026-06-21)	⚠️ any ACTIVE member
 POST	/decisions	Log a decision (extension/API use only)	⚠️
 GET	/decisions/:id	Full decision detail (incl. notes[] as of 2026-06-21)	⚠️
-POST	/decisions/:id/review	approve/reject/override/escalate	✅ owner/admin/approver (2026-06-21)
-POST	/decisions/:id/notes	Append a note	⚠️ intentional — any role incl. VIEWER may add a note
-GET	/decisions/contexts	List decision contexts (key/name/category)	n/a
+POST	/decisions/:id/review	approve/reject/override/escalate	✅ admin/staff (was owner/admin/approver pre-2026-06-26 — see Backend Change note)
+POST	/decisions/:id/notes	Append a note	⚠️ intentional — any role incl. STAFF may add a note
 GET	/decisions/types	List reserved + custom decision types	n/a
-POST	/decisions/types	Create custom type	✅ admin/owner (2026-06-21)
-PUT	/decisions/types/:typeId	Edit custom type (403 if reserved)	✅ admin/owner (2026-06-21)
-DELETE	/decisions/types/:typeId	Delete custom type (403 if reserved)	✅ admin/owner (2026-06-21)
+POST	/decisions/types	Create custom type	✅ admin (2026-06-21)
+PUT	/decisions/types/:typeId	Edit custom type (403 if reserved)	✅ admin (2026-06-21)
+DELETE	/decisions/types/:typeId	Delete custom type (403 if reserved)	✅ admin (2026-06-21)
 GET	/decisions/context-categories	List reserved + custom categories	n/a
-POST	/decisions/context-categories	Create custom category	✅ admin/owner (2026-06-21)
-PUT	/decisions/context-categories/:categoryId	Edit (403 if reserved)	✅ admin/owner (2026-06-21)
-DELETE	/decisions/context-categories/:categoryId	Delete (403 if reserved)	✅ admin/owner (2026-06-21)
+POST	/decisions/context-categories	Create custom category	✅ admin (2026-06-21)
+PUT	/decisions/context-categories/:categoryId	Edit (403 if reserved)	✅ admin (2026-06-21)
+DELETE	/decisions/context-categories/:categoryId	Delete (403 if reserved)	✅ admin (2026-06-21)
 GET	/ai-reports	List reports (?category_id=&status=)	n/a
 POST	/ai-reports/generate	Compile + return a report (synchronous)	⚠️
 GET	/ai-reports/:id	Full report incl. content markdown	n/a
@@ -260,6 +315,8 @@ production crash.
    product call, not a backend bug: the Chrome extension's documented payload (top of this doc)
    never sends `context_key`, so extension-captured decisions still won't auto-populate a category
    until that's addressed upstream in the extension.
+   **Superseded 2026-06-26** — `context_key`/`contextId`/`DecisionContext` no longer exist at all;
+   see "Backend Change — 2026-06-26" below.
 
 3. ~~GET /decisions/:id omits notes.~~ Fixed: `findDecisionById` now includes `notes[]`
    (oldest-first, `author{id,name,email}` embedded). Decision Detail renders real note history now
@@ -277,6 +334,10 @@ production crash.
    decisions. API-key/master-key callers (no membershipRole) bypass `requireRole` unconditionally —
    they're trusted server-to-server. Don't message this to users as "VIEWERs can never act on
    decisions" — they still can add notes by design, just not review/override/escalate.
+   **Superseded 2026-06-26** — OWNER/APPROVER/VIEWER no longer exist; `requireRole` checks now read
+   ADMIN/STAFF. Decision review stayed open to the non-admin role (STAFF inherits the old APPROVER's
+   review capability, not VIEWER's lack of it) — see "Backend Change — 2026-06-26: Membership role
+   model" below.
 
 Notifications bug (found during frontend integration, not in the original gap list): GET
 /notifications originally returned `{ data: { notifications: [...], unread_count } }` — `data` was an
@@ -296,6 +357,80 @@ this doc):
   canonical values are uppercase/underscore (`SIMILAR_CASE`, `POLICY_EXCEPTION`, etc.), not kebab-case.
 - `GET /memberships/client/:clientId` rows: `user` is optional, includes `image_url`, no `title`.
 - `GET /ai-reports`: no `slug` field; `title` is `null` until `status: "COMPLETED"`.
+- `context_category` (not `context_key`/`contextId`/`DecisionContext`, all retired 2026-06-26): a flat,
+  required string on both `GET /decisions` summaries and `GET /decisions/:id` detail.
+
+## Backend Change — 2026-06-26: `context_category` replaces the `DecisionContext` indirection
+
+The backend removed the `DecisionContext` model (the `context_key` → category lookup table) entirely.
+`Decision.contextId` (optional, pointed at `DecisionContext`) became `Decision.contextCategoryId`
+(required, FK straight to `ClientContextCategory`). Migration:
+`prisma/migrations/20260625120000_decision_context_category_direct` (backend repo) — backfills any
+existing `context_id` to the resolved category, defaults orphans to each client's `CUSTOM` category,
+then drops `decisions.context_id` and the `decision_contexts` table.
+
+What changed here as a result:
+- `POST /decisions` now takes `context_category` (required string, e.g. `"PAYMENT"`, `"SALES"`) instead
+  of the old optional `context_key`. It's resolved by value against the client's
+  `client_context_categories` table — exactly like `decision_type` already was — and the two fields stay
+  fully independent (no derivation between them).
+- `GET /decisions` and `GET /decisions/:id` both return a flat, required `context_category` string on
+  every decision — `Decision.context_category` in `src/lib/api.ts`.
+- `GET /decisions/contexts` is gone, along with the `DecisionContext` type and `listDecisionContexts()`
+  helper that called it — removed from `src/lib/api.ts`.
+- The per-decision "Context" line in generated AI report Markdown was removed on the backend —
+  redundant now that a report is already scoped to one category.
+- `src/components/decisions/DecisionFeed.tsx` renders `context_category` as a pill on every tile.
+  `src/components/decisions/DecisionDetail.tsx`'s info-pill grid shows Category in place of the old
+  Industry pill, and the Notes card moved up to sit directly below the main decision card. The
+  `context_key` disclaimer banner that used to sit above the report generator on
+  `src/app/reports/page.tsx` was removed — every decision is guaranteed a category now.
+
+Don't confuse `context_category` with `DecisionContextSnapshot` (the unrelated, optional `context` block
+on decision detail — signals/policies/agent_rationale/agent_model, see Required Screens §2 above).
+Similar name, unrelated feature — it predates this change and still works the same way.
+
+## Backend Change — 2026-06-26: Membership role model simplified to ADMIN/STAFF
+
+The backend collapsed the four-value `UserRole` enum down to two. This was a real schema migration
+(not a relabeling): `OWNER` and `ADMIN` merged into `ADMIN`; `APPROVER` and `VIEWER` merged into
+`STAFF`. The old values no longer exist in the database or codebase — `PATCH /memberships/:id/role`
+now rejects `OWNER`/`APPROVER`/`VIEWER` with a 400 zod-enum validation error.
+
+What changed here as a result — every file below was updated in this session:
+- `MembershipRole` in `src/lib/api.ts`: `"OWNER" | "ADMIN" | "APPROVER" | "VIEWER"` →
+  `"ADMIN" | "STAFF"`.
+- `src/app/team/page.tsx`: `ROLE_OPTIONS` is now `["ADMIN", "STAFF"]`; `isAdmin` checks `role ===
+  "ADMIN"` only.
+- `src/app/settings/page.tsx`, `src/app/sources/page.tsx`: same `isAdmin` simplification (these gate
+  Settings and Tracked Sites respectively).
+- `src/components/layout/navigation.tsx`: `ADMIN_ROLES` is now `["ADMIN"]` (gates Team, Tracked Sites,
+  Settings in the sidebar).
+- `src/components/decisions/DecisionFeed.tsx`: `isStaff` is now `role === "STAFF"` (drives the
+  `mine=true` scoped-feed filter — unchanged in spirit, just one role value instead of two).
+- `src/components/decisions/DecisionDetail.tsx`: `canReview` is now `role === "ADMIN" || role ===
+  "STAFF"` — i.e. effectively every active member, since the product spec for this migration listed
+  the admin-only surface as exactly "manage team roles, subject companies, decision types, context
+  categories" and did **not** include decision review. Read literally, this means STAFF inherited the
+  old APPROVER's review/approve/reject/override/escalate capability rather than VIEWER's restriction
+  from it. **This is an inference from the migration spec, not independently verified against the
+  backend's `requireRole` call for `POST /decisions/:id/review`** — if STAFF gets 403'd on review
+  actions in practice, tighten `canReview` back to ADMIN-only and flag it back upstream.
+
+Don't re-introduce `OWNER`, `APPROVER`, or `VIEWER` anywhere in this stack — grep for them before
+copy-pasting older role-gating code as a pattern.
+
+**Caveat hit in practice (2026-06-26, frontend-side, not yet root-caused on the backend):**
+`decision.context_category` came back `undefined` for at least one row from `GET /decisions` (list)
+even though it's documented/typed as required — crashed `DecisionFeed.tsx` on `.replace()`. Likely the
+list endpoint's summary projection doesn't select `context_category` for every row the same way
+`GET /decisions/:id` detail does (this codebase has hit exactly this list-vs-detail field-parity bug
+before — see the `notes[]`-missing-on-detail and paginated-envelope gaps above), but could also be
+pre-migration rows that never got backfilled. `Decision.context_category` is typed `string | null`
+(optional) in `src/lib/api.ts` as a result, and both `DecisionFeed.tsx` (skips the pill if absent) and
+`DecisionDetail.tsx` (falls back to `—`) render defensively rather than crash. If you're touching the
+backend list serializer, check whether `context_category` is actually selected there — don't assume the
+required-field guarantee holds for `GET /decisions` just because it holds for `GET /decisions/:id`.
 
 Architectural Principles to Carry Into the UI
 Inherited from the backend's product philosophy — keep these in mind for any UI/UX decision, not just data:

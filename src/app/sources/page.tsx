@@ -17,7 +17,7 @@ export default function SourcesPage() {
   const accessToken = session?.access_token;
   const clientId = activeMembership?.client.id;
   const role = activeMembership?.role;
-  const isAdmin = role === "ADMIN" || role === "OWNER";
+  const isAdmin = role === "ADMIN";
 
   const [sources, setSources] = useState<ClientSubjectCompany[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +45,7 @@ export default function SourcesPage() {
     return (
       <AppShell>
         <Card className="p-6">
-          <p className="text-sm text-ink-300">Only admins and owners can manage tracked sites.</p>
+          <p className="text-sm text-ink-300">Only admins can manage tracked sites.</p>
         </Card>
       </AppShell>
     );

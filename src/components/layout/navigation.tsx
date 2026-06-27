@@ -11,7 +11,7 @@ export type NavItem = {
   roles?: MembershipRole[];
 };
 
-const ADMIN_ROLES: MembershipRole[] = ["ADMIN", "OWNER"];
+const ADMIN_ROLES: MembershipRole[] = ["ADMIN"];
 
 export const primaryNav: NavItem[] = [
   {

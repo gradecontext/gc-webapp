@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   User,
+  UserCog,
   UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -253,6 +254,13 @@ export function Topbar({ onMenuToggle, minimal, transparent, className }: Topbar
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild className="cursor-pointer">
+                    <Link href="/profile">
+                      <UserCog className="mr-2 h-4 w-4" />
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="cursor-pointer text-ember-500 focus:text-ember-600"
                     onClick={() => signOut()}

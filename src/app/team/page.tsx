@@ -31,7 +31,7 @@ import {
   type RosterMember,
 } from "@/lib/api";
 
-const ROLE_OPTIONS: MembershipRole[] = ["OWNER", "ADMIN", "APPROVER", "VIEWER"];
+const ROLE_OPTIONS: MembershipRole[] = ["ADMIN", "STAFF"];
 const STATUS_OPTIONS: MembershipStatus[] = ["ACTIVE", "PENDING", "REJECTED", "REMOVED"];
 
 const STATUS_VARIANT: Record<MembershipStatus, BadgeProps["variant"]> = {
@@ -46,7 +46,7 @@ export default function TeamPage() {
   const accessToken = session?.access_token;
   const clientId = activeMembership?.client.id;
   const role = activeMembership?.role;
-  const isAdmin = role === "ADMIN" || role === "OWNER";
+  const isAdmin = role === "ADMIN";
 
   const [roster, setRoster] = useState<RosterMember[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -138,7 +138,7 @@ export default function TeamPage() {
     return (
       <AppShell>
         <Card className="p-6">
-          <p className="text-sm text-ink-300">Only admins and owners can manage the team.</p>
+          <p className="text-sm text-ink-300">Only admins can manage the team.</p>
         </Card>
       </AppShell>
     );

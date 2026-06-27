@@ -142,12 +142,6 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-haze-200 bg-white px-4 py-3 text-sm text-ink-300">
-          Reports compile from decisions tagged with a context category at creation time. If a
-          report shows zero decisions, it&apos;s likely because nothing has been logged with a &nbsp;
-          <span className="font-mono">context_key</span> yet.
-        </div>
-
         <Card className="p-6">
           <p className="section-title">Generate a report</p>
           {categories.length === 0 ? (

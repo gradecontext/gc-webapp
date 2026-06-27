@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import type { MembershipRole, MembershipStatus } from "@/lib/api";
 
 export type CompanySize =
   | "MICRO"
@@ -31,21 +32,74 @@ export interface CreateUserPayload {
   client: ClientInput;
 }
 
+export type Gender = "MALE" | "FEMALE" | "NON_BINARY" | "PREFER_NOT_TO_SAY";
+
+/**
+ * Embedded client on GET /users/me — richer than `MembershipClient` in api.ts
+ * (which backs the lighter `/memberships/me` roster picker), so kept separate
+ * rather than widening that type for fields the roster endpoint may not return.
+ */
+export interface ProfileMembershipClient {
+  id: number;
+  name: string;
+  slug: string;
+  domain?: string | null;
+  logo?: string | null;
+  cover_image?: string | null;
+  details?: string | null;
+  client_website?: string | null;
+  client_x?: string | null;
+  client_linkedin?: string | null;
+  client_instagram?: string | null;
+  verified: boolean;
+  plan: string;
+  active: boolean;
+}
+
+export interface ProfileMembership {
+  id: number;
+  client_id: number;
+  role: MembershipRole;
+  status: MembershipStatus;
+  created_at: string;
+  updated_at: string;
+  client: ProfileMembershipClient;
+}
+
 export interface BackendUserResponse {
   id: number;
+  supabase_auth_id?: string;
   email: string;
   name: string | null;
-  display_name: string | null;
-  role: string;
+  title?: string | null;
   active: boolean;
-  client_id: number;
-  client?: {
-    id: number;
-    name: string;
-    slug: string;
-    plan: string;
-    domain: string | null;
-  };
+  verified?: boolean;
+  display_name: string | null;
+  user_name?: string | null;
+  image_url?: string | null;
+  user_image?: string | null;
+  user_image_cover?: string | null;
+  user_bio_detail?: string | null;
+  user_bio_brief?: string | null;
+  gender?: Gender | null;
+  created_at?: string;
+  updated_at?: string;
+  memberships?: ProfileMembership[];
+  /** Omitted (not null) when the caller has >1 ACTIVE membership and no X-Client-Id was sent. */
+  client?: ProfileMembershipClient;
+}
+
+export interface UpdateProfilePayload {
+  name?: string;
+  title?: string;
+  display_name?: string;
+  user_name?: string;
+  image_url?: string;
+  user_image?: string;
+  user_image_cover?: string;
+  user_bio_detail?: string;
+  user_bio_brief?: string;
+  gender?: Gender;
 }
 
 export interface CreateUserResult {
@@ -106,4 +160,30 @@ export async function fetchCurrentUser(
   } catch {
     return { user: null, notFound: false };
   }
+}
+
+/** Updates the caller's own profile. The backend verifies ownership by supabaseAuthId. */
+export async function updateUserProfile(
+  userId: number,
+  payload: UpdateProfilePayload,
+  accessToken: string
+): Promise<BackendUserResponse> {
+  const res = await fetch(`${env.apiBaseUrl}/api/v1/users/${userId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    throw new Error(
+      body?.message ?? body?.error ?? `Update failed (${res.status})`
+    );
+  }
+
+  return body?.data ?? body;
 }

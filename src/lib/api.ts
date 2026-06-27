@@ -24,7 +24,7 @@ export type DecisionStatus =
 
 export type DecisionUrgency = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
 
-export type MembershipRole = "OWNER" | "ADMIN" | "APPROVER" | "VIEWER";
+export type MembershipRole = "ADMIN" | "STAFF";
 
 export type MembershipStatus = "ACTIVE" | "PENDING" | "REJECTED" | "REMOVED";
 
@@ -45,6 +45,7 @@ export type Decision = {
   id: string;
   summary: string | null;
   decision_type: string;
+  context_category?: string | null;
   status: DecisionStatus;
   urgency: DecisionUrgency;
   subject_company?: SubjectCompany | null;
@@ -118,15 +119,6 @@ export type CreateDecisionNoteRequest = {
   content: string;
   source_app?: string;
   source_url?: string;
-};
-
-export type DecisionContext = {
-  id: string;
-  key: string;
-  name: string;
-  description?: string | null;
-  category: string;
-  active: boolean;
 };
 
 export type Paginated<T> = {
@@ -400,10 +392,6 @@ export function addDecisionNote(
     method: "POST",
     body: JSON.stringify(payload),
   });
-}
-
-export function listDecisionContexts(auth: ApiAuth) {
-  return apiFetchArray<DecisionContext>("/decisions/contexts", auth);
 }
 
 // ============================================================

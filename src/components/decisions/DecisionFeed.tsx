@@ -55,7 +55,7 @@ export function DecisionFeed() {
   const accessToken = session?.access_token;
   const clientId = activeMembership?.client.id;
   const role = activeMembership?.role;
-  const isStaff = role === "VIEWER" || role === "APPROVER";
+  const isStaff = role === "STAFF";
 
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [total, setTotal] = useState(0);
@@ -194,6 +194,9 @@ export function DecisionFeed() {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {decision.context_category && (
+                      <Badge variant="ink">{decision.context_category.replace(/_/g, " ")}</Badge>
+                    )}
                     <Badge variant={URGENCY_VARIANT[decision.urgency] ?? "haze"}>
                       {decision.urgency}
                     </Badge>

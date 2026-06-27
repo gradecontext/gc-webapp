@@ -44,7 +44,7 @@ export default function SettingsPage() {
   const accessToken = session?.access_token;
   const clientId = activeMembership?.client.id;
   const role = activeMembership?.role;
-  const isAdmin = role === "ADMIN" || role === "OWNER";
+  const isAdmin = role === "ADMIN";
 
   const [types, setTypes] = useState<ClientDecisionType[]>([]);
   const [categories, setCategories] = useState<ClientContextCategory[]>([]);
@@ -87,7 +87,7 @@ export default function SettingsPage() {
         {!isAdmin ? (
           <Card className="p-6">
             <p className="text-sm text-ink-300">
-              Only admins and owners can manage decision types and context categories.
+              Only admins can manage decision types and context categories.
             </p>
           </Card>
         ) : (

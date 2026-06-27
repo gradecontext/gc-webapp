@@ -41,7 +41,9 @@ export function DecisionDetail({ id }: { id: string }) {
   const accessToken = session?.access_token;
   const clientId = activeMembership?.client.id;
   const role = activeMembership?.role;
-  const canReview = role === "APPROVER" || role === "ADMIN" || role === "OWNER";
+  // Only team-role management, subject companies, decision types, and context
+  // categories are admin-only under the ADMIN/STAFF model — review actions are not.
+  const canReview = role === "ADMIN" || role === "STAFF";
 
   const [decision, setDecision] = useState<DecisionDetailType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -178,9 +180,9 @@ export function DecisionDetail({ id }: { id: string }) {
 
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl bg-haze-100 px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-ink-300">Industry</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-ink-300">Category</p>
               <p className="text-sm font-semibold text-ink-900">
-                {decision.subject_company?.industry ?? "—"}
+                {decision.context_category?.replace(/_/g, " ") ?? "—"}
               </p>
             </div>
             <div className="rounded-2xl bg-haze-100 px-4 py-3">
@@ -196,6 +198,37 @@ export function DecisionDetail({ id }: { id: string }) {
               </p>
             </div>
           </div>
+        </Card>
+
+        <Card className="p-6">
+          <p className="section-title">Notes</p>
+          {notes.length === 0 ? (
+            <p className="mt-4 text-sm text-ink-300">No notes yet — the &quot;why&quot; behind this decision.</p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {notes.map((note) => (
+                <div key={note.id} className="rounded-2xl border border-haze-200 bg-white px-4 py-3">
+                  <p className="text-sm text-ink-700">{note.content}</p>
+                  <p className="mt-1 text-xs text-ink-300">
+                    {note.author?.name ?? note.author?.email ?? "Unknown"} ·{" "}
+                    {new Date(note.created_at).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <form onSubmit={handleAddNote} className="mt-4 space-y-3">
+            <Textarea
+              placeholder="Why was this decided? Add the rationale."
+              value={noteContent}
+              onChange={(e) => setNoteContent(e.target.value)}
+            />
+            {noteError && <p className="text-xs text-ember-500">{noteError}</p>}
+            <Button type="submit" size="sm" disabled={noteSubmitting || !noteContent.trim()}>
+              {noteSubmitting ? "Adding…" : "Add note"}
+            </Button>
+          </form>
         </Card>
 
         <Card className="p-6">
@@ -292,37 +325,6 @@ export function DecisionDetail({ id }: { id: string }) {
               ))}
             </div>
           )}
-        </Card>
-
-        <Card className="p-6">
-          <p className="section-title">Notes</p>
-          {notes.length === 0 ? (
-            <p className="mt-4 text-sm text-ink-300">No notes yet — the &quot;why&quot; behind this decision.</p>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {notes.map((note) => (
-                <div key={note.id} className="rounded-2xl border border-haze-200 bg-white px-4 py-3">
-                  <p className="text-sm text-ink-700">{note.content}</p>
-                  <p className="mt-1 text-xs text-ink-300">
-                    {note.author?.name ?? note.author?.email ?? "Unknown"} ·{" "}
-                    {new Date(note.created_at).toLocaleString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <form onSubmit={handleAddNote} className="mt-4 space-y-3">
-            <Textarea
-              placeholder="Why was this decided? Add the rationale."
-              value={noteContent}
-              onChange={(e) => setNoteContent(e.target.value)}
-            />
-            {noteError && <p className="text-xs text-ember-500">{noteError}</p>}
-            <Button type="submit" size="sm" disabled={noteSubmitting || !noteContent.trim()}>
-              {noteSubmitting ? "Adding…" : "Add note"}
-            </Button>
-          </form>
         </Card>
       </div>
 
