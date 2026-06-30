@@ -181,9 +181,16 @@ export function AuthContent({
     }
   }
 
+  // Hide footer only on the register-success (email verification) screen
+  const showFooter = !(tab === "register" && registered);
+
   return (
-    <div>
-      <div className="space-y-1 mb-4">
+    // flex-1 min-h-0 fills the dialog's definite h-[90vh] height and allows flex children to
+    // distribute space correctly. flex flex-col creates the three-zone layout.
+    <div className="flex flex-col flex-1 min-h-0">
+
+      {/* ── Zone 1: Header — never scrolls ── */}
+      <div className="flex-shrink-0 space-y-1 mb-4">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-ink-300">
           ContextGrade
         </p>
@@ -197,15 +204,17 @@ export function AuthContent({
         </p>
       </div>
 
+      {/* ── Zone 2: Tab switcher + scrollable form body ── */}
       <Tabs
         value={tab}
         onValueChange={(v) => {
           setTab(v as "sign-in" | "register");
           resetMessages();
         }}
-        className="mt-2"
+        className="flex flex-col flex-1 min-h-0 mt-2"
       >
-        <TabsList className="w-full">
+        {/* Tab pills — pinned at top, never scrolled away */}
+        <TabsList className="w-full flex-shrink-0">
           <TabsTrigger value="sign-in" className="flex-1">
             Sign In
           </TabsTrigger>
@@ -214,79 +223,63 @@ export function AuthContent({
           </TabsTrigger>
         </TabsList>
 
-        {/* ---------- SIGN IN ---------- */}
-        <TabsContent value="sign-in">
-          <form onSubmit={handleSignIn} className="space-y-4">
-            <Field label="Email" error={signInErrors.email}>
-              <Input
-                type="email"
-                placeholder="you@company.com"
-                value={signInForm.email}
-                onChange={(e) =>
-                  setSignInForm((p) => ({ ...p, email: e.target.value }))
-                }
-              />
-            </Field>
+        {/* Scrollable form content */}
+        <div className="flex-1 overflow-y-auto min-h-0 py-4">
+          {/* ---------- SIGN IN ---------- */}
+          <TabsContent value="sign-in" className="mt-0">
+            <form id="sign-in-form" onSubmit={handleSignIn} className="space-y-4">
+              <Field label="Email" error={signInErrors.email}>
+                <Input
+                  type="email"
+                  placeholder="you@company.com"
+                  value={signInForm.email}
+                  onChange={(e) =>
+                    setSignInForm((p) => ({ ...p, email: e.target.value }))
+                  }
+                />
+              </Field>
 
-            <Field label="Password" error={signInErrors.password}>
-              <Input
-                type="password"
-                placeholder="••••••••"
-                value={signInForm.password}
-                onChange={(e) =>
-                  setSignInForm((p) => ({ ...p, password: e.target.value }))
-                }
-              />
-            </Field>
+              <Field label="Password" error={signInErrors.password}>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={signInForm.password}
+                  onChange={(e) =>
+                    setSignInForm((p) => ({ ...p, password: e.target.value }))
+                  }
+                />
+              </Field>
 
-            {error && <Alert variant="error">{error}</Alert>}
+              {error && <Alert variant="error">{error}</Alert>}
+            </form>
+          </TabsContent>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in…" : "Sign In"}
-            </Button>
-          </form>
-
-          <Divider />
-
-          <Button
-            type="button"
-            variant="secondary"
-            className="w-full gap-3"
-            disabled={loading}
-            onClick={handleGoogleAuth}
-          >
-            <GoogleIcon />
-            Sign in with Google
-          </Button>
-        </TabsContent>
-
-        {/* ---------- REGISTER ---------- */}
-        <TabsContent value="register">
-          {registered ? (
-            <div className="flex flex-col items-center gap-4 py-6 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-mint-50">
-                <MailCheck className="h-7 w-7 text-mint-600" />
+          {/* ---------- REGISTER ---------- */}
+          <TabsContent value="register" className="mt-0">
+            {registered ? (
+              <div className="flex flex-col items-center gap-4 py-6 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-mint-50">
+                  <MailCheck className="h-7 w-7 text-mint-600" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold text-ink-900">
+                    Check your email
+                  </p>
+                  <p className="text-sm text-ink-400">
+                    We&apos;ve sent a verification link to{" "}
+                    <span className="font-medium text-ink-700">
+                      {registerForm.email}
+                    </span>
+                    . Click the link to verify your account, then you&apos;ll
+                    be able to complete your workspace setup.
+                  </p>
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => onSuccess?.()}>
+                  Got it
+                </Button>
               </div>
-              <div className="space-y-1">
-                <p className="text-lg font-semibold text-ink-900">
-                  Check your email
-                </p>
-                <p className="text-sm text-ink-400">
-                  We&apos;ve sent a verification link to{" "}
-                  <span className="font-medium text-ink-700">
-                    {registerForm.email}
-                  </span>
-                  . Click the link to verify your account, then you&apos;ll be
-                  able to complete your workspace setup.
-                </p>
-              </div>
-              <Button variant="secondary" size="sm" onClick={() => onSuccess?.()}>
-                Got it
-              </Button>
-            </div>
-          ) : (
-            <>
-              <form onSubmit={handleRegister} className="space-y-4">
+            ) : (
+              <form id="register-form" onSubmit={handleRegister} className="space-y-4">
                 <Field label="Full Name" error={registerErrors.name}>
                   <Input
                     placeholder="Adam Smith"
@@ -340,28 +333,42 @@ export function AuthContent({
                 </Field>
 
                 {error && <Alert variant="error">{error}</Alert>}
-
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Creating account…" : "Create Account"}
-                </Button>
               </form>
-
-              <Divider />
-
-              <Button
-                type="button"
-                variant="secondary"
-                className="w-full gap-3"
-                disabled={loading}
-                onClick={handleGoogleAuth}
-              >
-                <GoogleIcon />
-                Sign up with Google
-              </Button>
-            </>
-          )}
-        </TabsContent>
+            )}
+          </TabsContent>
+        </div>
       </Tabs>
+
+      {/* ── Zone 3: Footer — pinned at bottom, outside Tabs so it always stays ── */}
+      {showFooter && (
+        <div className="flex-shrink-0 pt-4 border-t border-haze-200 space-y-3">
+          <Button
+            type="submit"
+            form={tab === "sign-in" ? "sign-in-form" : "register-form"}
+            className="w-full"
+            disabled={loading}
+          >
+            {tab === "sign-in"
+              ? loading
+                ? "Signing in…"
+                : "Sign In"
+              : loading
+              ? "Creating account…"
+              : "Create Account"}
+          </Button>
+          <Divider />
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full gap-3"
+            disabled={loading}
+            onClick={handleGoogleAuth}
+          >
+            <GoogleIcon />
+            {tab === "sign-in" ? "Sign in with Google" : "Sign up with Google"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -406,7 +413,7 @@ function Alert({
 
 function Divider() {
   return (
-    <div className="my-5 flex items-center gap-3">
+    <div className="flex items-center gap-3">
       <div className="h-px flex-1 bg-haze-200" />
       <span className="text-xs text-ink-300">or continue with</span>
       <div className="h-px flex-1 bg-haze-200" />

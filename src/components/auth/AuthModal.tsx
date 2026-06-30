@@ -21,7 +21,7 @@ export function AuthModal({
 }: AuthModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="h-[90vh] overflow-hidden flex flex-col sm:max-w-md">
         {/* Visually hidden — Radix Dialog requires a title for screen reader accessibility */}
         <DialogTitle className="sr-only">Sign in to ContextGrade</DialogTitle>
         <DialogDescription className="sr-only">
