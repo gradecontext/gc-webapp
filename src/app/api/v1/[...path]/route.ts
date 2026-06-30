@@ -9,36 +9,48 @@ async function proxy(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ): Promise<NextResponse> {
-  const { path } = await params;
-  const { search } = new URL(request.url);
-  const targetUrl = `${UPSTREAM}/${path.join("/")}${search}`;
+  try {
+    const { path } = await params;
+    const { search } = new URL(request.url);
+    const targetUrl = `${UPSTREAM}/${path.join("/")}${search}`;
 
-  const headers = new Headers();
-  for (const key of FORWARDED_REQUEST_HEADERS) {
-    const value = request.headers.get(key);
-    if (value) headers.set(key, value);
-  }
-
-  const isBodyless = request.method === "GET" || request.method === "HEAD";
-  const body = isBodyless ? undefined : await request.arrayBuffer();
-
-  const upstream = await fetch(targetUrl, {
-    method: request.method,
-    headers,
-    body: body && body.byteLength > 0 ? body : undefined,
-  });
-
-  const responseHeaders = new Headers();
-  for (const [key, value] of upstream.headers.entries()) {
-    if (!STRIPPED_RESPONSE_HEADERS.includes(key.toLowerCase())) {
-      responseHeaders.set(key, value);
+    const headers = new Headers();
+    for (const key of FORWARDED_REQUEST_HEADERS) {
+      const value = request.headers.get(key);
+      if (value) headers.set(key, value);
     }
-  }
 
-  return new NextResponse(upstream.body, {
-    status: upstream.status,
-    headers: responseHeaders,
-  });
+    const isBodyless = request.method === "GET" || request.method === "HEAD";
+    const requestBody = isBodyless ? undefined : await request.arrayBuffer();
+
+    const upstream = await fetch(targetUrl, {
+      method: request.method,
+      headers,
+      body: requestBody && requestBody.byteLength > 0 ? requestBody : undefined,
+    });
+
+    const responseHeaders = new Headers();
+    for (const [key, value] of upstream.headers.entries()) {
+      if (!STRIPPED_RESPONSE_HEADERS.includes(key.toLowerCase())) {
+        responseHeaders.set(key, value);
+      }
+    }
+
+    // Read the full body into a buffer — streaming via upstream.body can fail
+    // in Cloudflare Workers when piped through NextResponse
+    const responseBody = await upstream.arrayBuffer();
+
+    return new NextResponse(responseBody, {
+      status: upstream.status,
+      headers: responseHeaders,
+    });
+  } catch (err) {
+    console.error("[CG proxy] upstream fetch failed:", err);
+    return NextResponse.json(
+      { error: "proxy_error", message: String(err) },
+      { status: 502 }
+    );
+  }
 }
 
 export const GET = proxy;
