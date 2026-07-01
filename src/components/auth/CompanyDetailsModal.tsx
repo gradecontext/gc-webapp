@@ -59,6 +59,7 @@ export function CompanyDetailsModal() {
     user,
     needsRegistration,
     signOut,
+    completeRegistration,
   } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -179,7 +180,7 @@ export function CompanyDetailsModal() {
 
     setLoading(true);
     try {
-      await createBackendUser(
+      const { user: backendUser } = await createBackendUser(
         {
           email: user.email,
           name:
@@ -200,14 +201,14 @@ export function CompanyDetailsModal() {
         accessToken,
       );
 
-      // Full page reload after registration — the backend is not ready to serve
-      // /memberships/me for a brand-new user in the same page-load cycle (same
-      // root cause as why a manual hard-refresh always fixes the 401). The auth
-      // callback now correctly sets session cookies, so AuthProvider will
-      // re-initialize cleanly: GET /users/me → 200, GET /memberships/me → 200.
-      window.location.replace("/");
+      // Set all auth state directly from the POST /users response — no extra
+      // API calls, no page reload. Avoids the backend timing window where
+      // GET /users/me and GET /memberships/me return 404/401 for a newly
+      // created user row.
+      await completeRegistration(backendUser, accessToken);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Setup failed");
+    } finally {
       setLoading(false);
     }
   }

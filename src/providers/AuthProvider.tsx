@@ -10,7 +10,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import { BackendUserResponse, fetchCurrentUser } from "@/lib/auth-api";
+import { BackendUserResponse, fetchCurrentUser, type ProfileMembership } from "@/lib/auth-api";
 import { getMyMemberships, type Membership } from "@/lib/api";
 
 const ACTIVE_CLIENT_STORAGE_KEY = "cg_active_client_id";
@@ -29,6 +29,12 @@ interface AuthContextType {
   activeMembership: Membership | null;
   setActiveClientId: (clientId: number) => void;
   refreshMemberships: (tokenOverride?: string) => Promise<void>;
+  /**
+   * Call this after POST /users succeeds. Sets all auth state directly from
+   * the registration response — no extra API calls, no page reload, no race
+   * with the backend indexing the new user row.
+   */
+  completeRegistration: (user: BackendUserResponse, accessToken: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -49,6 +55,23 @@ function syncSessionToLocalStorage(session: Session | null) {
   }
 }
 
+/** Map the richer ProfileMembership (from /users/me) to the leaner Membership shape. */
+function toMembership(pm: ProfileMembership): Membership {
+  return {
+    id: pm.id,
+    role: pm.role,
+    status: pm.status,
+    client: {
+      id: pm.client.id,
+      name: pm.client.name,
+      slug: pm.client.slug,
+      logo: pm.client.logo ?? null,
+      plan: pm.client.plan,
+      active: pm.client.active,
+    },
+  };
+}
+
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
@@ -57,9 +80,7 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [backendUser, setBackendUser] = useState<BackendUserResponse | null>(
-    null
-  );
+  const [backendUser, setBackendUser] = useState<BackendUserResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [needsRegistration, setNeedsRegistration] = useState(false);
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -70,28 +91,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return createClient();
   }, []);
 
+  const applyMembershipList = useCallback((list: Membership[]) => {
+    setMemberships(list);
+    const active = list.filter((m) => m.status === "ACTIVE");
+    const stored = Number(localStorage.getItem(ACTIVE_CLIENT_STORAGE_KEY));
+    const storedIsValid = active.some((m) => m.client.id === stored);
+
+    if (storedIsValid) {
+      setActiveClientIdState(stored);
+    } else if (active.length === 1) {
+      setActiveClientIdState(active[0].client.id);
+      localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, String(active[0].client.id));
+    } else {
+      setActiveClientIdState(null);
+    }
+  }, []);
+
   const loadMemberships = useCallback(async (accessToken: string) => {
     try {
       const list = await getMyMemberships({ accessToken });
-      setMemberships(list);
-
-      const active = list.filter((m) => m.status === "ACTIVE");
-      const stored = Number(localStorage.getItem(ACTIVE_CLIENT_STORAGE_KEY));
-      const storedIsValid = active.some((m) => m.client.id === stored);
-
-      if (storedIsValid) {
-        setActiveClientIdState(stored);
-      } else if (active.length === 1) {
-        setActiveClientIdState(active[0].client.id);
-        localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, String(active[0].client.id));
-      } else {
-        setActiveClientIdState(null);
-      }
+      applyMembershipList(list);
     } catch {
       setMemberships([]);
       setActiveClientIdState(null);
     }
-  }, []);
+  }, [applyMembershipList]);
 
   const checkBackendUser = useCallback(async (accessToken: string) => {
     const { user, notFound } = await fetchCurrentUser(accessToken);
@@ -110,11 +134,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshMemberships = useCallback(async (tokenOverride?: string) => {
-    // Prefer the caller-supplied token (e.g. from a form submission that already
-    // called getSession() once). Only fall back to getSession() when no token
-    // is passed — avoids a second round-trip AND ensures the same token that
-    // succeeded on the previous API call is reused here (prevents 401s from
-    // single-use token rotation in production).
     const token =
       tokenOverride ??
       (await supabase!.auth.getSession()).data.session?.access_token ??
@@ -123,6 +142,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await loadMemberships(token);
     }
   }, [supabase, session?.access_token, loadMemberships]);
+
+  /**
+   * Bootstrap auth state directly from the POST /users response.
+   *
+   * The backend takes a moment to make a freshly-created user row visible to
+   * subsequent authenticated endpoints (GET /users/me, GET /memberships/me).
+   * Rather than retrying those endpoints after registration, we read the data
+   * that was already returned by POST /users:
+   *
+   *   - backendUser  → set from the response directly (no GET /users/me)
+   *   - memberships  → set from response.memberships if the backend includes
+   *                    them; otherwise fall back to GET /memberships/me
+   *   - needsRegistration → set to false
+   *
+   * This is equivalent to what a hard-refresh achieves (AuthProvider
+   * re-initialises from a clean session) but without leaving the page.
+   */
+  const completeRegistration = useCallback(async (
+    user: BackendUserResponse,
+    accessToken: string,
+  ) => {
+    setBackendUser(user);
+
+    if (user.memberships && user.memberships.length > 0) {
+      applyMembershipList(user.memberships.map(toMembership));
+    } else {
+      // Backend didn't embed memberships in the POST /users response —
+      // fall back to fetching them. If this also 401s (backend still warming
+      // up), leave memberships empty; the PendingApprovalScreen handles that.
+      await loadMemberships(accessToken);
+    }
+
+    setNeedsRegistration(false);
+  }, [applyMembershipList, loadMemberships]);
 
   const activeMembership = useMemo(
     () => memberships.find((m) => m.client.id === activeClientId) ?? null,
@@ -191,6 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       activeMembership,
       setActiveClientId,
       refreshMemberships,
+      completeRegistration,
     }),
     [
       session,
@@ -203,6 +257,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       activeMembership,
       setActiveClientId,
       refreshMemberships,
+      completeRegistration,
     ]
   );
 
