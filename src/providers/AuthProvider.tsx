@@ -168,14 +168,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (user.memberships && user.memberships.length > 0) {
       applyMembershipList(user.memberships.map(toMembership));
     } else {
-      // Backend didn't embed memberships in the POST /users response —
-      // fall back to fetching them. If this also 401s (backend still warming
-      // up), leave memberships empty; the PendingApprovalScreen handles that.
-      await loadMemberships(accessToken);
+      // Backend has read-replica lag: GET /memberships/me can return 401 for
+      // ~500ms after POST /users even with a valid token, then 200 on the next
+      // identical request. Retry with backoff instead of giving up immediately.
+      const delays = [400, 800, 1600, 3000];
+      let loaded = false;
+      for (let i = 0; i <= delays.length; i++) {
+        try {
+          const list = await getMyMemberships({ accessToken });
+          applyMembershipList(list);
+          loaded = true;
+          break;
+        } catch {
+          if (i < delays.length) {
+            await new Promise((r) => setTimeout(r, delays[i]));
+          }
+        }
+      }
+      if (!loaded) {
+        setMemberships([]);
+        setActiveClientIdState(null);
+      }
     }
 
     setNeedsRegistration(false);
-  }, [applyMembershipList, loadMemberships]);
+  }, [applyMembershipList]);
 
   const activeMembership = useMemo(
     () => memberships.find((m) => m.client.id === activeClientId) ?? null,
