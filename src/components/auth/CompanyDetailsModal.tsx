@@ -191,8 +191,8 @@ export function CompanyDetailsModal() {
       );
 
       setBackendUser(backendUser);
-      setNeedsRegistration(false);
       await refreshMemberships();
+      setNeedsRegistration(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Setup failed");
     } finally {

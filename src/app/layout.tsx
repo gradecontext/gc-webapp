@@ -3,6 +3,7 @@ import { Manrope, Sora } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { CompanyDetailsModal } from "@/components/auth/CompanyDetailsModal";
+import { PendingApprovalScreen } from "@/components/auth/PendingApprovalScreen";
 
 const displayFont = Sora({
   subsets: ["latin"],
@@ -35,6 +36,7 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <CompanyDetailsModal />
+          <PendingApprovalScreen />
         </AuthProvider>
       </body>
     </html>

@@ -152,7 +152,7 @@ export async function fetchCurrentUser(
       return { user, notFound: false };
     }
 
-    if (res.status === 404 || res.status === 401) {
+    if (res.status === 404) {
       return { user: null, notFound: true };
     }
 
