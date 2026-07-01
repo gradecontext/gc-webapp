@@ -110,10 +110,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshMemberships = useCallback(async () => {
-    if (session?.access_token) {
-      await loadMemberships(session.access_token);
+    // Always fetch a fresh token from Supabase rather than reading from React
+    // state — the stored session can be stale if TOKEN_REFRESHED fired between
+    // the last render and this call, which causes a 401 in production.
+    const { data } = await supabase!.auth.getSession();
+    const token = data.session?.access_token ?? session?.access_token;
+    if (token) {
+      await loadMemberships(token);
     }
-  }, [session?.access_token, loadMemberships]);
+  }, [supabase, session?.access_token, loadMemberships]);
 
   const activeMembership = useMemo(
     () => memberships.find((m) => m.client.id === activeClientId) ?? null,
