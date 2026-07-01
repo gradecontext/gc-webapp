@@ -58,10 +58,7 @@ export function CompanyDetailsModal() {
     session,
     user,
     needsRegistration,
-    setBackendUser,
-    setNeedsRegistration,
     signOut,
-    refreshMemberships,
   } = useAuth();
 
   const [loading, setLoading] = useState(false);
@@ -182,7 +179,7 @@ export function CompanyDetailsModal() {
 
     setLoading(true);
     try {
-      const { user: backendUser } = await createBackendUser(
+      await createBackendUser(
         {
           email: user.email,
           name:
@@ -203,15 +200,14 @@ export function CompanyDetailsModal() {
         accessToken,
       );
 
-      setBackendUser(backendUser);
-      // Pass the same token so refreshMemberships doesn't call getSession()
-      // again — avoids a second round-trip and guarantees both calls use the
-      // identical token (actmyagent pattern: extract once, pass explicitly).
-      await refreshMemberships(accessToken);
-      setNeedsRegistration(false);
+      // Full page reload after registration — the backend is not ready to serve
+      // /memberships/me for a brand-new user in the same page-load cycle (same
+      // root cause as why a manual hard-refresh always fixes the 401). The auth
+      // callback now correctly sets session cookies, so AuthProvider will
+      // re-initialize cleanly: GET /users/me → 200, GET /memberships/me → 200.
+      window.location.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Setup failed");
-    } finally {
       setLoading(false);
     }
   }
