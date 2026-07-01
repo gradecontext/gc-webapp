@@ -241,6 +241,7 @@ export type ClientSearchResult = {
   name: string;
   slug?: string;
   plan?: string;
+  domain?: string | null;
 };
 
 // ============================================================

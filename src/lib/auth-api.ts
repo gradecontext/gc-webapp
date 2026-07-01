@@ -15,6 +15,7 @@ export interface ClientInput {
   client_id?: number;
   client_name?: string;
   plan?: ClientPlan;
+  domain?: string;
   details?: string;
   logo?: string;
   client_website?: string;

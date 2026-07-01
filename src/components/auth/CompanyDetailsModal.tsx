@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   createBackendUser,
-  type ClientPlan,
   type CompanySize,
 } from "@/lib/auth-api";
 import { searchClients, type ClientSearchResult } from "@/lib/api";
@@ -28,13 +27,56 @@ import {
 } from "@/components/ui/select";
 import { Building2, Loader2, Search, X } from "lucide-react";
 
+const PUBLIC_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "google.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "msn.com",
+  "yahoo.com",
+  "yahoo.co.uk",
+  "yahoo.co.in",
+  "ymail.com",
+  "aol.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "protonmail.com",
+  "proton.me",
+  "zoho.com",
+  "zohomail.com",
+  "mail.com",
+  "gmx.com",
+  "gmx.net",
+  "fastmail.com",
+  "tutanota.com",
+  "tuta.io",
+  "hey.com",
+  "pm.me",
+  "yandex.com",
+  "yandex.ru",
+  "qq.com",
+  "163.com",
+  "126.com",
+  "rediffmail.com",
+  "xyz.com",
+]);
+
 const companySchema = z.object({
   client_name: z.string().min(1, "Company name is required"),
   client_id: z.number().optional(),
   company_size: z
     .enum(["MICRO", "SMALL", "MEDIUM", "LARGE", "ENTERPRISE", "MEGA"])
     .optional(),
-  plan: z.enum(["FREE", "STARTER", "PROFESSIONAL", "ENTERPRISE"]).optional(),
+  domain: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^[a-zA-Z0-9][a-zA-Z0-9-_.]+\.[a-zA-Z]{2,}$/.test(val),
+      "Enter a valid domain without https:// (e.g. contextgrade.com)",
+    ),
 });
 
 const COMPANY_SIZES: { value: CompanySize; label: string }[] = [
@@ -44,13 +86,6 @@ const COMPANY_SIZES: { value: CompanySize; label: string }[] = [
   { value: "LARGE", label: "Large (201–1,000 employees)" },
   { value: "ENTERPRISE", label: "Enterprise (1,001–5,000 employees)" },
   { value: "MEGA", label: "Mega (5,000+ employees)" },
-];
-
-const PLANS: { value: ClientPlan; label: string }[] = [
-  { value: "FREE", label: "Free" },
-  { value: "STARTER", label: "Starter" },
-  { value: "PROFESSIONAL", label: "Professional" },
-  { value: "ENTERPRISE", label: "Enterprise" },
 ];
 
 export function CompanyDetailsModal() {
@@ -68,17 +103,38 @@ export function CompanyDetailsModal() {
     client_name: "",
     client_id: undefined as number | undefined,
     company_size: undefined as CompanySize | undefined,
-    plan: undefined as ClientPlan | undefined,
+    domain: "",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const [searchResults, setSearchResults] = useState<ClientSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [domainFocused, setDomainFocused] = useState(false);
   const [selectedCompany, setSelectedCompany] =
     useState<ClientSearchResult | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Domain derived from the user's email, empty for public providers.
+  const emailDomain = useMemo(() => {
+    if (!user?.email) return "";
+    const atIdx = user.email.lastIndexOf("@");
+    if (atIdx === -1) return "";
+    const domain = user.email.slice(atIdx + 1).toLowerCase();
+    return PUBLIC_EMAIL_DOMAINS.has(domain) ? "" : domain;
+  }, [user?.email]);
+
+  // Pre-fill domain from email once it resolves (and no company is selected).
+  useEffect(() => {
+    if (emailDomain && !selectedCompany) {
+      setForm((p) => ({ ...p, domain: emailDomain }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emailDomain]);
+
+  // True when the selected company supplied a domain from the backend — field is read-only.
+  const domainLocked = Boolean(selectedCompany?.domain);
 
   const runClientSearch = useCallback(
     async (query: string) => {
@@ -107,6 +163,8 @@ export function CompanyDetailsModal() {
   function handleCompanyNameChange(value: string) {
     setForm((p) => ({ ...p, client_name: value, client_id: undefined }));
     setSelectedCompany(null);
+    // Restore email-derived domain when user clears company selection by typing.
+    setForm((p) => ({ ...p, client_name: value, client_id: undefined, domain: emailDomain }));
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -124,13 +182,20 @@ export function CompanyDetailsModal() {
       ...p,
       client_name: client.name,
       client_id: client.id,
+      // If the backend returned a domain for this company, lock and show it.
+      domain: client.domain ?? p.domain,
     }));
     setShowDropdown(false);
   }
 
   function clearSelectedCompany() {
     setSelectedCompany(null);
-    setForm((p) => ({ ...p, client_name: "", client_id: undefined }));
+    setForm((p) => ({
+      ...p,
+      client_name: "",
+      client_id: undefined,
+      domain: emailDomain,
+    }));
   }
 
   useEffect(() => {
@@ -178,6 +243,8 @@ export function CompanyDetailsModal() {
       return;
     }
 
+    const joiningExisting = Boolean(result.data.client_id);
+
     setLoading(true);
     try {
       const { user: backendUser } = await createBackendUser(
@@ -189,10 +256,13 @@ export function CompanyDetailsModal() {
             undefined,
           display_name: user.user_metadata?.name ?? undefined,
           client: {
-            ...(result.data.client_id
+            ...(joiningExisting
               ? { client_id: result.data.client_id }
-              : { client_name: result.data.client_name }),
-            plan: result.data.plan ?? "STARTER",
+              : {
+                  client_name: result.data.client_name,
+                  // Domain only sent when creating a new company.
+                  ...(result.data.domain ? { domain: result.data.domain } : {}),
+                }),
             settings: result.data.company_size
               ? { company_size: result.data.company_size }
               : undefined,
@@ -339,25 +409,39 @@ export function CompanyDetailsModal() {
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-ink-700">
-              Subscription Plan
+              Company Domain{" "}
+              {!domainLocked && (
+                <span className="font-normal text-ink-300">(optional)</span>
+              )}
             </label>
-            <Select
-              value={form.plan ?? ""}
-              onValueChange={(v) =>
-                setForm((p) => ({ ...p, plan: v as ClientPlan }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Starter (default)" />
-              </SelectTrigger>
-              <SelectContent>
-                {PLANS.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
-                    {p.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Input
+              placeholder="contextgrade.com"
+              value={form.domain}
+              disabled={domainLocked}
+              onFocus={() => setDomainFocused(true)}
+              onBlur={() => setDomainFocused(false)}
+              onChange={(e) => {
+                const stripped = e.target.value
+                  .trim()
+                  .replace(/^https?:\/\//i, "")
+                  .replace(/\/+$/, "");
+                setForm((p) => ({ ...p, domain: stripped }));
+              }}
+              className={domainLocked ? "cursor-not-allowed opacity-60" : ""}
+            />
+            {domainLocked && (
+              <p className="text-xs text-ink-300">
+                Domain is set by the existing company.
+              </p>
+            )}
+            {!domainLocked && domainFocused && !fieldErrors.domain && (
+              <p className="text-xs text-ink-300">
+                Domain only — no https:// or www (e.g. contextgrade.com)
+              </p>
+            )}
+            {!domainLocked && fieldErrors.domain && (
+              <p className="text-xs text-ember-500">{fieldErrors.domain}</p>
+            )}
           </div>
 
           {error && (
