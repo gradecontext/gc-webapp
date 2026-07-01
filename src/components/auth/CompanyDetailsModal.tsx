@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
 import {
   createBackendUser,
@@ -162,7 +163,19 @@ export function CompanyDetailsModal() {
       return;
     }
 
-    if (!session?.access_token || !user?.email) {
+    if (!user?.email) {
+      setError("Session expired. Please sign in again.");
+      return;
+    }
+
+    // Get the freshest token once right before submission — do NOT read from
+    // React state (session.access_token) here. If TOKEN_REFRESHED fired since
+    // the last render, React state has the old token and the backend will 401.
+    // Calling getSession() returns whatever Supabase currently considers valid.
+    const { data: freshData } = await createClient().auth.getSession();
+    const accessToken = freshData.session?.access_token;
+
+    if (!accessToken) {
       setError("Session expired. Please sign in again.");
       return;
     }
@@ -187,11 +200,14 @@ export function CompanyDetailsModal() {
               : undefined,
           },
         },
-        session.access_token,
+        accessToken,
       );
 
       setBackendUser(backendUser);
-      await refreshMemberships();
+      // Pass the same token so refreshMemberships doesn't call getSession()
+      // again — avoids a second round-trip and guarantees both calls use the
+      // identical token (actmyagent pattern: extract once, pass explicitly).
+      await refreshMemberships(accessToken);
       setNeedsRegistration(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Setup failed");

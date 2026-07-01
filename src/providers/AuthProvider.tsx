@@ -28,7 +28,7 @@ interface AuthContextType {
   memberships: Membership[];
   activeMembership: Membership | null;
   setActiveClientId: (clientId: number) => void;
-  refreshMemberships: () => Promise<void>;
+  refreshMemberships: (tokenOverride?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -109,12 +109,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setActiveClientIdState(clientId);
   }, []);
 
-  const refreshMemberships = useCallback(async () => {
-    // Always fetch a fresh token from Supabase rather than reading from React
-    // state — the stored session can be stale if TOKEN_REFRESHED fired between
-    // the last render and this call, which causes a 401 in production.
-    const { data } = await supabase!.auth.getSession();
-    const token = data.session?.access_token ?? session?.access_token;
+  const refreshMemberships = useCallback(async (tokenOverride?: string) => {
+    // Prefer the caller-supplied token (e.g. from a form submission that already
+    // called getSession() once). Only fall back to getSession() when no token
+    // is passed — avoids a second round-trip AND ensures the same token that
+    // succeeded on the previous API call is reused here (prevents 401s from
+    // single-use token rotation in production).
+    const token =
+      tokenOverride ??
+      (await supabase!.auth.getSession()).data.session?.access_token ??
+      session?.access_token;
     if (token) {
       await loadMemberships(token);
     }
