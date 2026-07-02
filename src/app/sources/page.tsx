@@ -9,6 +9,7 @@ import {
   createSubjectCompany,
   deleteSubjectCompany,
   listSubjectCompanies,
+  updateSubjectCompany,
   type ClientSubjectCompany,
 } from "@/lib/api";
 
@@ -74,6 +75,11 @@ export default function SourcesPage() {
           onDelete={async (row) => {
             if (!accessToken || !clientId) return;
             await deleteSubjectCompany(row.id, { accessToken, clientId });
+            await load();
+          }}
+          onReactivate={async (row) => {
+            if (!accessToken || !clientId) return;
+            await updateSubjectCompany(row.id, { active: true }, { accessToken, clientId });
             await load();
           }}
         />

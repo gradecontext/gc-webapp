@@ -488,6 +488,18 @@ export function deleteSubjectCompany(subjectCompanyId: number, auth: ApiAuth) {
   });
 }
 
+export function updateSubjectCompany(
+  subjectCompanyId: number,
+  payload: { active?: boolean; name?: string; domain?: string },
+  auth: ApiAuth
+) {
+  return apiFetch<ClientSubjectCompany>(
+    `/decisions/subject-companies/${subjectCompanyId}`,
+    auth,
+    { method: "PUT", body: JSON.stringify(payload) }
+  );
+}
+
 // ============================================================
 // AI DECISION REPORTS
 // ============================================================

@@ -21,6 +21,7 @@ interface SubjectCompaniesPanelProps {
   error: string | null;
   onCreate: (payload: { name: string; domain: string }) => Promise<void>;
   onDelete: (row: ClientSubjectCompany) => Promise<void>;
+  onReactivate: (row: ClientSubjectCompany) => Promise<void>;
 }
 
 export function SubjectCompaniesPanel({
@@ -29,6 +30,7 @@ export function SubjectCompaniesPanel({
   error,
   onCreate,
   onDelete,
+  onReactivate,
 }: SubjectCompaniesPanelProps) {
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
@@ -59,6 +61,15 @@ export function SubjectCompaniesPanel({
     setBusyRowId(row.id);
     try {
       await onDelete(row);
+    } finally {
+      setBusyRowId(null);
+    }
+  }
+
+  async function handleReactivate(row: ClientSubjectCompany) {
+    setBusyRowId(row.id);
+    try {
+      await onReactivate(row);
     } finally {
       setBusyRowId(null);
     }
@@ -120,7 +131,7 @@ export function SubjectCompaniesPanel({
                   <Badge variant={row.active ? "mint" : "haze"}>
                     {row.active ? "Active" : "Inactive"}
                   </Badge>
-                  {row.active && (
+                  {row.active ? (
                     <Button
                       variant="secondary"
                       size="sm"
@@ -128,6 +139,15 @@ export function SubjectCompaniesPanel({
                       onClick={() => handleDelete(row)}
                     >
                       {busyRowId === row.id ? "Removing…" : "Delete"}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={busyRowId === row.id}
+                      onClick={() => handleReactivate(row)}
+                    >
+                      {busyRowId === row.id ? "Reactivating…" : "Reactivate"}
                     </Button>
                   )}
                 </div>
