@@ -21,6 +21,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
+  ApiError,
   approveMembership,
   changeMembershipRole,
   getClientRoster,
@@ -30,6 +31,7 @@ import {
   type MembershipStatus,
   type RosterMember,
 } from "@/lib/api";
+import { PlanLimitBanner } from "@/components/billing/PlanLimitBanner";
 
 const ROLE_OPTIONS: MembershipRole[] = ["ADMIN", "STAFF"];
 const STATUS_OPTIONS: MembershipStatus[] = ["ACTIVE", "PENDING", "REJECTED", "REMOVED"];
@@ -54,6 +56,7 @@ export default function TeamPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [removeTarget, setRemoveTarget] = useState<RosterMember | null>(null);
+  const [seatLimitError, setSeatLimitError] = useState<unknown>(null);
 
   const load = useCallback(async () => {
     if (!accessToken || !clientId) return;
@@ -81,11 +84,16 @@ export default function TeamPage() {
     if (!accessToken || !clientId) return;
     setBusyId(member.id);
     setError(null);
+    setSeatLimitError(null);
     try {
       await approveMembership(member.id, { accessToken, clientId });
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve member");
+      if (err instanceof ApiError && err.status === 402) {
+        setSeatLimitError(err);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to approve member");
+      }
     } finally {
       setBusyId(null);
     }
@@ -207,6 +215,8 @@ export default function TeamPage() {
             </SelectContent>
           </Select>
         </div>
+
+        <PlanLimitBanner error={seatLimitError} onDismiss={() => setSeatLimitError(null)} />
 
         {error && (
           <div className="rounded-2xl bg-ember-50 px-4 py-3 text-sm text-ember-600">{error}</div>

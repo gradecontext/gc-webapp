@@ -14,6 +14,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import {
+  ApiError,
   generateAiReport,
   getAiReport,
   listAiReports,
@@ -22,6 +23,7 @@ import {
   type AiReportStatus,
   type ClientContextCategory,
 } from "@/lib/api";
+import { PlanLimitBanner } from "@/components/billing/PlanLimitBanner";
 
 const STATUS_OPTIONS: AiReportStatus[] = ["PENDING", "GENERATING", "COMPLETED", "FAILED"];
 
@@ -48,6 +50,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generatingCategoryId, setGeneratingCategoryId] = useState<string | null>(null);
+  const [featureLimitError, setFeatureLimitError] = useState<unknown>(null);
 
   const [selected, setSelected] = useState<AiDecisionReport | null>(null);
   const [selectedLoading, setSelectedLoading] = useState(false);
@@ -85,12 +88,17 @@ export default function ReportsPage() {
     if (!accessToken || !clientId) return;
     setGeneratingCategoryId(categoryId);
     setError(null);
+    setFeatureLimitError(null);
     try {
       const report = await generateAiReport(categoryId, { accessToken, clientId });
       await loadReports();
       setSelected(report);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate report");
+      if (err instanceof ApiError && err.status === 402) {
+        setFeatureLimitError(err);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to generate report");
+      }
     } finally {
       setGeneratingCategoryId(null);
     }
@@ -201,6 +209,11 @@ export default function ReportsPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            <PlanLimitBanner
+              error={featureLimitError}
+              onDismiss={() => setFeatureLimitError(null)}
+            />
 
             {error && (
               <div className="rounded-2xl bg-ember-50 px-4 py-3 text-sm text-ember-600">{error}</div>

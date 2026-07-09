@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { ApiError } from "@/lib/api";
+import { PlanLimitBanner } from "@/components/billing/PlanLimitBanner";
 
 export type SettingsRow = {
   id: string;
@@ -45,6 +47,7 @@ export function SettingsCrudPanel({
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [createLimitError, setCreateLimitError] = useState<unknown>(null);
   const [busyRowId, setBusyRowId] = useState<string | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
@@ -52,11 +55,16 @@ export function SettingsCrudPanel({
     if (!newName.trim()) return;
     setCreating(true);
     setCreateError(null);
+    setCreateLimitError(null);
     try {
       await onCreate(newName.trim());
       setNewName("");
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Failed to create");
+      if (err instanceof ApiError && err.status === 402) {
+        setCreateLimitError(err);
+      } else {
+        setCreateError(err instanceof Error ? err.message : "Failed to create");
+      }
     } finally {
       setCreating(false);
     }
@@ -104,6 +112,14 @@ export function SettingsCrudPanel({
           </Button>
         </form>
         {createError && <p className="mt-2 text-xs text-ember-500">{createError}</p>}
+        {!!createLimitError && (
+          <div className="mt-2">
+            <PlanLimitBanner
+              error={createLimitError}
+              onDismiss={() => setCreateLimitError(null)}
+            />
+          </div>
+        )}
       </Card>
 
       {error && (

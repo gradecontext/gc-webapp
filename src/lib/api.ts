@@ -301,6 +301,18 @@ function asPaginated<T>(body: unknown): Paginated<T> {
   return { items: [], page: 1, limit: 0, total: 0 };
 }
 
+/** Typed API error that carries the HTTP status and raw response body. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly body: unknown
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function requestJson(
   path: string,
   auth: ApiAuth,
@@ -318,7 +330,7 @@ async function requestJson(
       (body as { message?: string; error?: string } | null)?.message ??
       (body as { message?: string; error?: string } | null)?.error ??
       `API error ${res.status}: ${path}`;
-    throw new Error(message);
+    throw new ApiError(message, res.status, body);
   }
 
   return body;
@@ -603,4 +615,102 @@ export function searchClients(name: string, auth: ApiAuth) {
     `/clients/search${query({ name, page: 1, limit: 10 })}`,
     auth
   );
+}
+
+// ============================================================
+// BILLING
+// ============================================================
+
+export type PlanTier = "FREE" | "GROWTH" | "SCALE" | "ENTERPRISE";
+export type SubStatus = "ACTIVE" | "TRIALING" | "PAST_DUE" | "CANCELED" | "INCOMPLETE";
+export type BillingCycle = "MONTHLY" | "ANNUAL";
+
+export type BillingFeatures = {
+  AI_REPORTS: boolean | number;
+  DECISION_EXPORT: boolean;
+  API_ACCESS: boolean;
+  CUSTOM_TYPES: boolean | number;
+  AUDIT_LOG: boolean;
+  SSO: boolean;
+};
+
+export type BillingSubscription = {
+  plan: PlanTier;
+  status: SubStatus;
+  billingCycle: BillingCycle;
+  seatCount: number;
+  seatLimit: number;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  trialEndsAt: string | null;
+  features: BillingFeatures;
+  stripeCustomerId: string | null;
+};
+
+export type PlanCatalogEntry = {
+  plan: PlanTier;
+  minSeats: number;
+  maxSeats: number | null;
+  pricePerSeatMonthly: number;
+  pricePerSeatAnnual: number;
+  minimumMonthlyCharge: number;
+  features: BillingFeatures;
+};
+
+export type BillingPreview = {
+  plan: PlanTier;
+  billingCycle: BillingCycle;
+  seatCount: number;
+  amountDue: number;
+  currency: string;
+  prorationDate: string;
+};
+
+export function getBilling(auth: ApiAuth) {
+  return apiFetch<BillingSubscription>("/billing", auth);
+}
+
+export function getPlans(auth: ApiAuth) {
+  return apiFetchArray<PlanCatalogEntry>("/billing/plans", auth);
+}
+
+export function createCheckoutSession(
+  payload: {
+    plan: PlanTier;
+    billing_cycle: BillingCycle;
+    success_url: string;
+    cancel_url: string;
+  },
+  auth: ApiAuth
+) {
+  return apiFetch<{ url: string }>("/billing/checkout", auth, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getBillingPortal(returnUrl: string, auth: ApiAuth) {
+  return apiFetch<{ url: string }>(
+    `/billing/portal${query({ return_url: returnUrl })}`,
+    auth
+  );
+}
+
+export function getBillingPreview(
+  params: { plan: PlanTier; seat_count: number },
+  auth: ApiAuth
+) {
+  return apiFetch<BillingPreview>(`/billing/preview${query(params)}`, auth);
+}
+
+export function cancelBilling(auth: ApiAuth) {
+  return apiFetch<{ success: boolean; message: string }>("/billing/cancel", auth, {
+    method: "POST",
+  });
+}
+
+export function reactivateBilling(auth: ApiAuth) {
+  return apiFetch<{ success: boolean; message: string }>("/billing/reactivate", auth, {
+    method: "POST",
+  });
 }
