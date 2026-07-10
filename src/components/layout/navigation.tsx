@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { ListChecks, ShieldCheck, FileText, Users, Globe, CreditCard } from "lucide-react";
+import { ListChecks, ShieldCheck, FileText, Users, Globe, CreditCard, KeyRound } from "lucide-react";
 import type { MembershipRole } from "@/lib/api";
 
 export type NavItem = {
@@ -48,6 +48,13 @@ export const secondaryNav: NavItem[] = [
     href: "/settings",
     icon: ShieldCheck,
     description: "Decision types & context categories",
+    roles: ADMIN_ROLES,
+  },
+  {
+    label: "MCP Integration",
+    href: "/settings/mcp",
+    icon: KeyRound,
+    description: "Connect AI tools to your decision reports",
     roles: ADMIN_ROLES,
   },
   {

@@ -618,6 +618,22 @@ export function searchClients(name: string, auth: ApiAuth) {
 }
 
 // ============================================================
+// MCP INTEGRATION
+// ============================================================
+// Read-only key that grants AI tools (Claude Code, Claude Desktop, Cursor,
+// etc.) MCP access to a client's compiled AI Decision Reports. Distinct from
+// any other API key the dashboard surfaces — this one is report-read-only
+// and has no rotate/regenerate endpoint yet.
+
+export type McpKeyResponse = {
+  mcp_api_key: string | null;
+};
+
+export function getMcpKey(auth: ApiAuth) {
+  return apiFetch<McpKeyResponse>("/clients/mcp-key", auth);
+}
+
+// ============================================================
 // BILLING
 // ============================================================
 
