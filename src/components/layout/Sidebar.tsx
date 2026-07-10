@@ -50,11 +50,11 @@ export function Sidebar({ open, onClose, className }: SidebarProps) {
 
       {/* Navigation — scrollable area */}
       <div className="sidebar-scroll -mx-2 flex-1 overflow-y-auto px-2">
-        <div className="space-y-8 pb-6">
+        <div className="space-y-5 pb-4">
           {/* Core section */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <p className="section-title px-3">Core</p>
-            <nav className="space-y-1">
+            <nav className="space-y-0.5">
               {primaryNav.map((item) => {
                 const isActive = pathname === item.href;
                 return (
@@ -63,7 +63,7 @@ export function Sidebar({ open, onClose, className }: SidebarProps) {
                     href={item.href}
                     onClick={onClose}
                     className={cn(
-                      "group flex items-start gap-3 rounded-2xl border border-transparent px-3 py-3 transition",
+                      "group flex items-center gap-2.5 rounded-xl border border-transparent px-2.5 py-2 transition",
                       isActive
                         ? "border-accent-200 bg-accent-50 shadow-sm"
                         : "hover:border-haze-200 hover:bg-haze-100",
@@ -71,24 +71,24 @@ export function Sidebar({ open, onClose, className }: SidebarProps) {
                   >
                     <div
                       className={cn(
-                        "mt-0.5 rounded-xl p-2 transition",
+                        "rounded-lg p-1.5 transition",
                         isActive
                           ? "bg-gradient-accent text-white shadow-sm"
                           : "bg-haze-100 text-ink-700 group-hover:bg-white",
                       )}
                     >
-                      <item.icon className="h-5 w-5" />
+                      <item.icon className="h-4 w-4" />
                     </div>
                     <div>
                       <p
                         className={cn(
-                          "text-sm font-semibold",
+                          "text-[13px] font-semibold leading-tight",
                           isActive ? "text-accent-700" : "text-ink-900",
                         )}
                       >
                         {item.label}
                       </p>
-                      <p className="text-xs text-ink-300">{item.description}</p>
+                      <p className="text-[11px] leading-tight text-ink-300">{item.description}</p>
                     </div>
                   </Link>
                 );
@@ -98,9 +98,9 @@ export function Sidebar({ open, onClose, className }: SidebarProps) {
 
           {/* Operations section */}
           {visibleSecondaryNav.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <p className="section-title px-3">Operations</p>
-            <nav className="space-y-1">
+            <nav className="space-y-0.5">
               {visibleSecondaryNav.map((item) => {
                 const isActive = pathname === item.href;
                 return (
@@ -109,7 +109,7 @@ export function Sidebar({ open, onClose, className }: SidebarProps) {
                     href={item.href}
                     onClick={onClose}
                     className={cn(
-                      "group flex items-start gap-3 rounded-2xl border border-transparent px-3 py-3 transition",
+                      "group flex items-center gap-2.5 rounded-xl border border-transparent px-2.5 py-2 transition",
                       isActive
                         ? "border-accent-200 bg-accent-50 shadow-sm"
                         : "hover:border-haze-200 hover:bg-haze-100",
@@ -117,24 +117,24 @@ export function Sidebar({ open, onClose, className }: SidebarProps) {
                   >
                     <div
                       className={cn(
-                        "mt-0.5 rounded-xl p-2 transition",
+                        "rounded-lg p-1.5 transition",
                         isActive
                           ? "bg-gradient-accent text-white shadow-sm"
                           : "bg-haze-100 text-ink-700 group-hover:bg-white",
                       )}
                     >
-                      <item.icon className="h-5 w-5" />
+                      <item.icon className="h-4 w-4" />
                     </div>
                     <div>
                       <p
                         className={cn(
-                          "text-sm font-semibold",
+                          "text-[13px] font-semibold leading-tight",
                           isActive ? "text-accent-700" : "text-ink-900",
                         )}
                       >
                         {item.label}
                       </p>
-                      <p className="text-xs text-ink-300">{item.description}</p>
+                      <p className="text-[11px] leading-tight text-ink-300">{item.description}</p>
                     </div>
                   </Link>
                 );
@@ -155,7 +155,7 @@ export function Sidebar({ open, onClose, className }: SidebarProps) {
       {/* ── Desktop sidebar ── */}
       <aside
         className={cn(
-          "hidden lg:flex lg:flex-col lg:gap-6 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:shrink-0 lg:border-r lg:border-white/70 lg:bg-white/70 lg:p-6 lg:backdrop-blur-xl",
+          "hidden lg:flex lg:flex-col lg:gap-4 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:shrink-0 lg:border-r lg:border-white/70 lg:bg-white/70 lg:p-5 lg:backdrop-blur-xl",
           className,
         )}
       >
