@@ -79,6 +79,7 @@ export function UpgradeModal({ open, onOpenChange, plans, auth }: UpgradeModalPr
           </DialogDescription>
         </DialogHeader>
 
+        <div className="space-y-4 pt-2">
         {/* Billing cycle toggle */}
         <div className="flex items-center gap-1 self-start rounded-full border border-haze-200 bg-haze-50 p-1">
           {(["MONTHLY", "ANNUAL"] as BillingCycle[]).map((c) => (
@@ -186,6 +187,7 @@ export function UpgradeModal({ open, onOpenChange, plans, auth }: UpgradeModalPr
               </button>
             );
           })}
+        </div>
         </div>
 
         {error && (
