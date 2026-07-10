@@ -541,7 +541,13 @@ export function getAiReport(id: string, auth: ApiAuth) {
  * than throwing, since "unknown/not-ready id" is an expected case for a public link.
  */
 export async function getPublicAiReport(id: string): Promise<AiDecisionReport | null> {
-  const res = await fetch(`${env.apiBaseUrl}/api/v1/ai-reports/${id}/public`);
+  // Called server-side (see src/app/decision/context/reports/[id]/route.ts), which runs
+  // inside the Worker itself with no page origin to resolve a relative URL against —
+  // env.apiBaseUrl is intentionally "" in production so *browser* calls hit the
+  // same-origin proxy at src/app/api/v1/[...path]/route.ts instead. That proxy's
+  // hardcoded upstream is the fallback here since there's no origin to inherit.
+  const base = env.apiBaseUrl || "https://api.contextgrade.com";
+  const res = await fetch(`${base}/api/v1/ai-reports/${id}/public`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`API error ${res.status}: /ai-reports/${id}/public`);
   return res.json();
