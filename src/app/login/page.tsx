@@ -1,15 +1,26 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { AuthContent } from "@/components/auth/AuthContent";
+import { useAuth } from "@/providers/AuthProvider";
 
 function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/decisions";
+  const redirect = searchParams.get("redirect") || "/";
   const fromExtension = searchParams.get("from") === "extension";
+  const { session, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && session) {
+      router.replace(redirect);
+    }
+  }, [loading, session, redirect, router]);
+
+  // Already signed in (or we don't know yet) — don't flash the form.
+  if (loading || session) return null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-haze-50 px-6 py-12">

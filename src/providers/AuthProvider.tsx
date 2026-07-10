@@ -192,7 +192,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setNeedsRegistration(false);
-  }, [applyMembershipList]);
+
+    // The extension's content script validates any session it captures by
+    // calling GET /users/me — which 404s until this point, since no User row
+    // exists yet. Re-broadcast the (unchanged) session now that registration
+    // is done so the extension gets a fresh signal to retry validation.
+    if (session) syncSessionToLocalStorage(session);
+  }, [applyMembershipList, session]);
 
   const activeMembership = useMemo(
     () => memberships.find((m) => m.client.id === activeClientId) ?? null,
