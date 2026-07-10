@@ -49,7 +49,7 @@ export function Sidebar({ open, onClose, className }: SidebarProps) {
       </div>
 
       {/* Navigation — scrollable area */}
-      <div className="sidebar-scroll -mx-2 flex-1 overflow-y-auto px-2">
+      <div className="sidebar-scroll -mx-2 mt-10 flex-1 overflow-y-auto px-2">
         <div className="space-y-5 pb-4">
           {/* Core section */}
           <div className="space-y-2">
