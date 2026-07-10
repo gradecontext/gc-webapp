@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
@@ -117,15 +118,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [applyMembershipList]);
 
-  const checkBackendUser = useCallback(async (accessToken: string) => {
-    const { user, notFound } = await fetchCurrentUser(accessToken);
-    if (user) {
-      setBackendUser(user);
-      setNeedsRegistration(false);
-      await loadMemberships(accessToken);
-    } else if (notFound) {
-      setNeedsRegistration(true);
+  // Coalesces calls that are genuinely concurrent for the same token (e.g. the
+  // getSession()/onAuthStateChange race on mount) into one request. Cleared as
+  // soon as it resolves, so it never masks a later, deliberate refresh.
+  const inFlightCheckRef = useRef<{ token: string; promise: Promise<void> } | null>(null);
+
+  const checkBackendUser = useCallback((accessToken: string): Promise<void> => {
+    if (inFlightCheckRef.current?.token === accessToken) {
+      return inFlightCheckRef.current.promise;
     }
+
+    const promise = (async () => {
+      const { user, notFound } = await fetchCurrentUser(accessToken);
+      if (user) {
+        setBackendUser(user);
+        setNeedsRegistration(false);
+        await loadMemberships(accessToken);
+      } else if (notFound) {
+        setNeedsRegistration(true);
+      }
+    })().finally(() => {
+      if (inFlightCheckRef.current?.token === accessToken) {
+        inFlightCheckRef.current = null;
+      }
+    });
+
+    inFlightCheckRef.current = { token: accessToken, promise };
+    return promise;
   }, [loadMemberships]);
 
   const setActiveClientId = useCallback((clientId: number) => {
@@ -220,7 +239,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, s) => {
+    } = supabase.auth.onAuthStateChange(async (event, s) => {
+      // INITIAL_SESSION carries the same session getSession() above just
+      // fetched — skip it here or every mount with an existing session
+      // double-fires GET /users/me for identical data.
+      if (event === "INITIAL_SESSION") return;
+
       setSession(s);
       syncSessionToLocalStorage(s);
       if (s?.access_token) {
