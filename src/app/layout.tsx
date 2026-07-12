@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { Manrope, Sora } from "next/font/google";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { CompanyDetailsModal } from "@/components/auth/CompanyDetailsModal";
 import { PendingApprovalScreen } from "@/components/auth/PendingApprovalScreen";
+import { env } from "@/lib/env";
 
 const displayFont = Sora({
   subsets: ["latin"],
@@ -38,6 +40,7 @@ export default function RootLayout({
           <CompanyDetailsModal />
           <PendingApprovalScreen />
         </AuthProvider>
+        {env.gaMeasurementId && <GoogleAnalytics gaId={env.gaMeasurementId} />}
       </body>
     </html>
   );

@@ -10,9 +10,11 @@ import {
   useState,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import { sendGAEvent } from "@next/third-parties/google";
 import { createClient } from "@/lib/supabase/client";
 import { BackendUserResponse, fetchCurrentUser, type ProfileMembership } from "@/lib/auth-api";
 import { getMyMemberships, type Membership } from "@/lib/api";
+import { env } from "@/lib/env";
 
 const ACTIVE_CLIENT_STORAGE_KEY = "cg_active_client_id";
 
@@ -259,6 +261,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, [supabase, checkBackendUser]);
+
+  // Attribute all GA hits on this domain to the signed-in backend user, so
+  // registrations/conversions tracked here roll up under the same person GA
+  // saw on the contextgrade.com landing site. Never send email/PII — just
+  // the backend numeric id. Fires on initial session bootstrap and again
+  // right after completeRegistration sets backendUser for a brand-new user.
+  useEffect(() => {
+    sendGAEvent("config", env.gaMeasurementId, {
+      user_id: backendUser ? String(backendUser.id) : null,
+    });
+  }, [backendUser]);
 
   const signOut = useCallback(async () => {
     await supabase?.auth.signOut();

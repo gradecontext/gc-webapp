@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
+import { sendGAEvent } from "@next/third-parties/google";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/providers/AuthProvider";
 import {
@@ -276,6 +277,16 @@ export function CompanyDetailsModal() {
       // GET /users/me and GET /memberships/me return 404/401 for a newly
       // created user row.
       await completeRegistration(backendUser, accessToken);
+
+      // This POST /users success is the true "account created" moment for
+      // every signup path (email/password after verification, and Google
+      // OAuth) — needsRegistration only gates a user with no backend User
+      // row yet, so this only fires once per person. Fire the conversion
+      // event here rather than at the Supabase auth.signUp() call, since
+      // that only creates a pending, unverified Supabase Auth identity.
+      sendGAEvent("event", "sign_up", {
+        method: user.app_metadata?.provider ?? "email",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Setup failed");
     } finally {
