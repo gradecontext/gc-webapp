@@ -5,6 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { CompanyDetailsModal } from "@/components/auth/CompanyDetailsModal";
 import { PendingApprovalScreen } from "@/components/auth/PendingApprovalScreen";
+import { InstallExtensionPrompt } from "@/components/extension/InstallExtensionPrompt";
 import { env } from "@/lib/env";
 
 const displayFont = Sora({
@@ -39,6 +40,7 @@ export default function RootLayout({
           {children}
           <CompanyDetailsModal />
           <PendingApprovalScreen />
+          <InstallExtensionPrompt />
         </AuthProvider>
         {env.gaMeasurementId && <GoogleAnalytics gaId={env.gaMeasurementId} />}
       </body>
